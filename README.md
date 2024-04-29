@@ -9,7 +9,13 @@ A GitHub Action for generating PDF reports for GitHub Advanced Security Code Sca
 The action comes with some predefined HTML templates using [Nunjucks](https://mozilla.github.io/nunjucks/templating.html),
 along with the ability to in the future provide your own templates to the renderer.
 
+## Background
+
 This codebase started out as a fork of https://github.com/peter-murray/github-security-report-action and has since diverged, this is the repository where all new features will be delivered.
+
+The active development focus is to provide an updated reporting action that can be evaluated and tested within customer use cases and to build out the various report templates to cover a number of reporting scenarios.
+
+Until the project reaches a `1.0.0` state, it will not be supporting contributions via Pull Requests, at which time it will support "normal" Open Source contributions as detailed in the [CONTRIBUTING.md](CONTRIBUTING.md).
 
 
 ## Processing
@@ -55,8 +61,9 @@ Example summary report output:
 ![Example summary report](docs/images/summary_report_example.png)
 
 
-## Future improvements
+## License
+This project is licensed under the terms of the MIT open source license, Please refer to [LICENSE](LICENSE) for the full terms.
 
-* Add support for selecting reporting templates to the parameters
-* Example of extending html templates and using them
 
+## Acknowledgements
+The original code base was based off the original https://github.com/peter-murray/github-security-report-action.
