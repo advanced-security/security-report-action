@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <mate charest="utf-8"/>
+  <title>GitHub Advanced Security Report</title>
+
+  <style type="text/css">
+      .report {
+          margin: 30px;
+      }
+
+      .heading {
+          margin-bottom: 50px;
+      }
+
+      .section {
+          margin-bottom: 50px;
+      }
+
+      .section-header {
+          margin-bottom: 20px;
+      }
+
+      /*.row {*/
+      /*    margin-bottom: 10px;*/
+      /*}*/
+
+      /* Allows for PDF to use coloured components */
+      @media print {
+          * {
+              -webkit-print-color-adjust: exact;
+          }
+      }
+  </style>
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css"
+        integrity="sha384-JcKb8q3iqJ61gNV9KGb8thSsNjpSL0n8PARn9HuZOnIxN0hoP+VmmDGMN5t9UJ0Z" crossorigin="anonymous">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+</head>
+
+<body>
+
+<div class="report container-fluid">
+  <div class="row border-bottom heading">
+    <div class="col">
+      <img class="githubLogo float-left"
+           width="130px"
+           src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png">
+      <h1 class="reportTitle display-4">GitHub Advanced Security<br>Summary Report</h1>
+    </div>
+  </div>
+
+  <div class="row mt-4">
+    <dt class="col-sm-2">GitHub Repository:</dt>
+    <dd class="col-sm-9">{{ github.owner }}/{{ github.repo }}</dd>
+
+    <dt class="col-sm-2">Generated:</dt>
+    <dd class="col-sm-9">{{ metadata.created }}</dd>
+    </dl>
+  </div>
+
+  {% if sca %}
+  <div class="sca section mt-4">
+    <div class="row">
+      <div class="col">
+        <h2 class="section-header border-bottom">Software Composition Analysis</h2>
+      </div>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2">
+      <div class="col mb-4">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="float-left">Dependencies</h5>
+            <h5><span class="badge badge-light float-right">{{ sca.dependencies.totalDependencies }}</span></h5>
+          </div>
+
+          <div class="card-body">
+            <button type="button" class="btn btn-danger">
+              Unprocessed manifests <span class="badge badge-light">{{ sca.dependencies.manifests.unprocessed | length }}</span>
+            </button>
+            <button type="button" class="btn btn-success">
+              Processed manifests <span
+                class="badge badge-light">{{ sca.dependencies.manifests.processed | length }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {% if sca.vulnerabilities %}
+      <div class="col mb-4">
+        <div class="card vulnerabilities">
+          <div class="card-header">
+            <h5 class="float-left">Dependency Vulnerabilities</h5>
+            <h5><span class="badge badge-light float-right">{{ sca.vulnerabilities.total }}</span></h5>
+          </div>
+
+          <div class="card-body">
+            <button type="button" class="btn btn-danger">
+              High <span class="badge badge-light">{{ sca.vulnerabilities.bySeverity.high | length }}</span>
+            </button>
+            <button type="button" class="btn btn-warning">
+              Warning <span class="badge badge-light">{{ sca.vulnerabilities.bySeverity.warning | length }}</span>
+            </button>
+            <button type="button" class="btn btn-info">
+              Moderate <span class="badge badge-light">{{ sca.vulnerabilities.bySeverity.moderate | length }}</span>
+            </button>
+            <button type="button" class="btn btn-secondary">
+              Low <span class="badge badge-light">{{ sca.vulnerabilities.bySeverity.low | length }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if scanning %}
+  <div class="scanning section mt-4">
+    <div class="row mb-3">
+      <div class="col">
+        <h2 class="section-header border-bottom">Code Scanning</h2>
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="float-left">Code Scanning Rules Applied</h5>
+            <h5><span class="badge badge-light float-right">{{ scanning.rules | length }}</span></h5>
+          </div>
+        </div>
+      </div>
+
+      <div class="col"></div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col">
+        <div class="card">
+          <div class="card-header">
+            <h5 class="float-left">CWE Coverage</h5>
+            <h5><span class="badge badge-light float-right">{{ scanning.cwe.cwes | length }}</span></h5>
+          </div>
+          <div class="card-body">
+            <div>
+              <ul class="list-inline">
+                {% for cwe in scanning.cwe.cwes | sort %}
+                <li class="text-monospace badge badge-secondary m-1">{{ cwe }}</li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2 mb-3">
+      <div class="col mb-4">
+        {% if scanning.results.open %}
+        <div class="card">
+          <div class="card-header">
+            <h5 class="float-left">Open Findings</h5>
+            <h5><span class="badge badge-light float-right">{{ scanning.results.open.total }}</span></h5>
+          </div>
+          <div class="card-body">
+            {% if scanning.results.open.total > 0 %}
+            <button type="button" class="btn btn-danger">
+              Error <span class="badge badge-light">{{ scanning.results.open.scans.error | length }}</span>
+            </button>
+            <button type="button" class="btn btn-warning">
+              Warning <span class="badge badge-light">{{ scanning.results.open.scans.warning | length }}</span>
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-secondary">No Results <span class="badge badge-light">0</span></button>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="col mb-4">
+        {% if scanning.results.closed %}
+        <div class="card">
+          <div class="card-header">
+            <h5 class="float-left">Closed Findings</h5>
+            <h5><span class="badge badge-light float-right">{{ scanning.results.closed.total }}</span></h5>
+          </div>
+          <div class="card-body">
+            {% if scanning.results.closed.total > 0 %}
+            <button type="button" class="btn btn-danger">
+              Error <span class="badge badge-light">{{ scanning.results.closed.scans.error | length }}</span>
+            </button>
+            <button type="button" class="btn btn-warning">
+              Warning <span class="badge badge-light">{{ scanning.results.closed.scans.warning | length }}</span>
+            </button>
+            {% else %}
+            <button type="button" class="btn btn-secondary">No Results <span class="badge badge-light">0</span></button>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!--
+{{ sca | dump }}
+{{ scanning | dump }}
+-->
+
+</body>
+</html>

@@ -1,0 +1,60 @@
+name: GitHub Security Report Action
+description: Generates security reports for a GitHub repository
+author: Peter Murray
+
+inputs:
+  token:
+    description: GitHub Access Token with permissions for securoty events access on the repository.
+    default: ${{ github.token }}
+
+  outputDir:
+    description: The output directory for the generated report(s).
+    required: true
+    default: ${{ github.workspace }}
+
+  repository:
+    description: Repository name with owner. For example, peter-murray/github-security-report
+    required: true
+    default: ${{ github.repository }}
+
+  sarif_report_id:
+    description: The latest SARIF report id to use for the analysis of the code scanning results, if not specified the latest report will be used for the target ref.
+    required: false
+
+  ref:
+    description: The ref for the target to get the code scanning findings for
+    required: true
+    default: ${{ github.ref }}
+
+  sha:
+    description: The SHA of the HEAD of the ref for the scanning results
+    required: true
+    default: ${{ github.sha }}
+
+  report_template:
+    description: The template to use for the report being generated
+    required: false
+    default: summary
+
+  include_code_scanning:
+    description: Include code scanning data in the report
+    required: false
+    default: true
+
+  include_secret_scanning:
+    description: Include secret scanning data in the report
+    required: false
+    default: true
+
+  include_software_composition_analysis:
+    description: Include software compositiona analysis data in the report
+    required: false
+    default: true
+
+runs:
+  using: node20
+  main: dist/index.js
+
+branding:
+  icon: shield
+  color: green

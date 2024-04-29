@@ -1,0 +1,30 @@
+node_modules
+*.tgz
+
+.DS_Store
+
+# Intermeidate directory to TS to JS
+lib
+
+# IntelliJ IDEA
+.idea
+
+# Binary executables
+github-security-report*
+.local-chromium/
+runtime/
+tmp/
+*.zip
+
+# Output directory for tests generating reports or other temp data
+_tmp/
+
+# Any PDF files generated from testing
+*.pdf
+
+# Puppeteer cache
+.cache
+
+# CLI tools
+cli
+!src/cli

@@ -1,0 +1,22 @@
+{
+  "name": "Node.js 18",
+  "image": "ghcr.io/octodemo/development-containers/javascript:base-202401-r1",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "GitHub.copilot",
+        "kingwl.vscode-vitest-runner",
+        "mathematic.vscode-pdf"
+      ]
+    }
+  },
+
+  // If the puppeteer tests are to work, we need a number of dependencies installed in to the container
+  "postStartCommand": ".devcontainer/install_chrome_deps.sh",
+
+  "hostRequirements": {
+    "cpus": 4,
+    "memory": "8gb",
+    "storage": "32gb"
+ }
+}
