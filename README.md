@@ -9,6 +9,8 @@ A GitHub Action for generating PDF reports for GitHub Advanced Security Code Sca
 The action comes with some predefined HTML templates using [Nunjucks](https://mozilla.github.io/nunjucks/templating.html),
 along with the ability to in the future provide your own templates to the renderer.
 
+This codebase started out as a fork of https://github.com/peter-murray/github-security-report-action and has since diverged, this is the repository where all new features will be delivered.
+
 
 ## Processing
 
