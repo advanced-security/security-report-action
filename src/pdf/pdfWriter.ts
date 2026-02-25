@@ -9,12 +9,11 @@ export async function createPDF(html: string, file: string): Promise<string> {
 
   const installedBrowser = await browsers.install({
     browser: browsers.Browser.CHROME,
-    // buildId: '117.0.5859.0',
-    buildId: '114.0.5735.133',
+    buildId: '124.0.6367.91',
     cacheDir,
   });
 
-  // console.log(JSON.stringify(installedBrowser, null, 2));
+  console.log(JSON.stringify(installedBrowser, null, 2));
 
   const executablePath = path.join(installedBrowser.path, getChromeLinux64Path());
   const executableStats = fs.statSync(executablePath);

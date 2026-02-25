@@ -1,24 +1,22 @@
-import { expect } from 'chai';
+import { describe, expect, it, beforeAll } from 'vitest';
 import GitHubDependencies from './GitHubDependencies';
 
 import { Octokit } from '@octokit/rest';
 import DependencySet from './DependencySet';
 import Dependency from './Dependency';
-import { getGitHubToken } from '../testUtils';
+import { getGitHubTestToken } from '../testUtils';
 
-describe.skip('GitHubDependencies', function ()  {
-
-  this.timeout(10 * 1000);
+describe('GitHubDependencies', function ()  {
 
   const testRepo = {
-    owner: 'octodemo',
+    owner: 'octodemo-db',
     repo: 'demo-vulnerabilities-ghas'
   };
 
   let ghDeps: GitHubDependencies;
 
-  before(() => {
-    const octokit = new Octokit({auth: getGitHubToken()});
+  beforeAll(() => {
+    const octokit = new Octokit({auth: getGitHubTestToken()});
     ghDeps = new GitHubDependencies(octokit);
   });
 
@@ -32,7 +30,7 @@ describe.skip('GitHubDependencies', function ()  {
 
       const dep: Dependency = results[0].dependencies[0];
       expect(dep.packageType).to.equal('MAVEN');
-    });
+    }, 10 * 1000);
   });
 
   describe('#getAllVulnerabilities()', () => {
@@ -41,6 +39,6 @@ describe.skip('GitHubDependencies', function ()  {
       const results = await ghDeps.getAllVulnerabilities(testRepo);
 
       expect(results).to.have.length.greaterThan(10);
-    });
+    }, 10 * 1000);
   });
 });

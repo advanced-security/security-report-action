@@ -1,24 +1,24 @@
 
 import Vulnerability from '../dependencies/Vulnerability';
 import DependencySet from '../dependencies/DependencySet';
-import CodeScanningResults from '../codeScanning/CodeScanningResults';
+import CodeScanningResults from '../code-scanning/CodeScanningResults';
 import { Repo } from '../github';
-import { GitHubSarifRule, SarifRuleJson } from '../codeScanning/GitHubSarifRule';
-import { LatestAnalysisScanResults } from '../codeScanning/GitHubCodeScanning';
+import { GitHubSarifRule, SarifRuleJson } from '../code-scanning/GitHubSarifRule';
+import { CodeScanningAnalysisWithSarifData } from '../code-scanning/GitHubCodeScanning';
 
 
-//TODO might no be valid now
+//TODO might not be valid now
 export type CodeScanningRules = {
   [key: string]: GitHubSarifRule
 }
 
 export type CollectedData = {
   github: Repo
-  vulnerabilities: Vulnerability[],
-  dependencies: DependencySet[],
-  codeScanning: LatestAnalysisScanResults,
-  codeScanningOpen: CodeScanningResults,
-  codeScanningClosed: CodeScanningResults,
+  vulnerabilities?: Vulnerability[],
+  dependencies?: DependencySet[],
+  codeScanning?: CodeScanningAnalysisWithSarifData,
+  codeScanningOpen?: CodeScanningResults,
+  codeScanningClosed?: CodeScanningResults,
 }
 
 export type JsonPayload = {

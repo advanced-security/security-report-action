@@ -24,3 +24,7 @@ _tmp/
 
 # Puppeteer cache
 .cache
+
+# CLI tools
+cli
+!src/cli

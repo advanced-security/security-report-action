@@ -1,18 +1,21 @@
 import Vulnerability from '../dependencies/Vulnerability';
 import DependencySet from '../dependencies/DependencySet';
-import CodeScanningResults from '../codeScanning/CodeScanningResults';
+import CodeScanningResults from '../code-scanning/CodeScanningResults';
 import {
   AlertSummary,
-  CodeScanningRules, CodeScanResults, CodeScanSummary,
+  CodeScanResults,
+  CodeScanSummary,
   CollectedData,
-  CWECoverage, Dependencies,
+  CWECoverage,
+  Dependencies,
   DependencySummary,
   JsonPayload, Manifest,
-  ServerityToVulnerabilities, SeverityToAlertSummary
+  ServerityToVulnerabilities,
+  SeverityToAlertSummary
 } from './ReportTypes';
 import { Repo } from '../github';
-import { GitHubSarifReport } from '../codeScanning/GitHubSarifReport';
-import { GitHubSarifRule, SarifRuleJson } from '../codeScanning/GitHubSarifRule';
+import { GitHubSarifReport } from '../code-scanning/GitHubSarifReport';
+import { GitHubSarifRule, SarifRuleJson } from '../code-scanning/GitHubSarifRule';
 
 export default class ReportData {
 
@@ -22,7 +25,7 @@ export default class ReportData {
 
   constructor(data: CollectedData) {
     this.data = data || {};
-    this.sarifReport = new GitHubSarifReport(this.data?.codeScanning?.sarif || {});
+    this.sarifReport = new GitHubSarifReport(this.data?.codeScanning?.sarif);
   }
 
   get githubRepo(): Repo {
@@ -50,11 +53,11 @@ export default class ReportData {
   }
 
   get openCodeScanResults(): CodeScanningResults {
-    return this.data.codeScanningOpen || {};
+    return this.data.codeScanningOpen || new CodeScanningResults();
   }
 
   get closedCodeScanResults(): CodeScanningResults {
-    return this.data.codeScanningClosed || {};
+    return this.data.codeScanningClosed || new CodeScanningResults();
   }
 
   get codeScanningReport(): GitHubSarifReport {
