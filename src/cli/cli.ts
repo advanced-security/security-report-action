@@ -1,7 +1,10 @@
-import ReportGenerator, { ReportGeneratorConfig } from './ReportGenerator';
+//TODO needs to be polished up to be consistent with the action one we provide the necessary inputs and controls on that
+
+import ReportGenerator, { ReportGeneratorConfig } from '../ReportGenerator';
 import { Octokit } from '@octokit/rest';
 
 import path from 'path';
+import { ConsoleLogger } from '../logging/ConsoleLogger';
 
 const {program} = require('commander');
 program.name('github-security-report');
@@ -22,7 +25,13 @@ const reportGenerateConfig: ReportGeneratorConfig = {
   outputDirectory: getPath(opts.outputDirectory),
   templating: {
     name: 'summary'
-  }
+  },
+  include: {
+    codeScanning: true,
+    secretScanning: true,
+    softwareCompositionAnalysis: true
+  },
+  logger: new ConsoleLogger()
 }
 
 async function execute(reportGenerateConfig: ReportGeneratorConfig) {

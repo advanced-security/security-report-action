@@ -1,8 +1,11 @@
 import path from 'path';
 import fs from 'fs';
 
+import { describe, expect, test } from 'vitest';
+
+import {getSampleSarifDirectory} from '../testUtils';
 import {GitHubSarifReport} from './GitHubSarifReport';
-import { expect } from 'chai';
+
 
 describe('SarifReport', () => {
 
@@ -10,7 +13,7 @@ describe('SarifReport', () => {
 
     const data = loadSarifFile('octodemo', 'test', 'github_codeql_sarif.json');
 
-    it('should load a CodeQL SARIF report', () => {
+    test('should load a CodeQL SARIF report', () => {
       const report = new GitHubSarifReport(data);
       expect(report.rules.length).to.equal(108);
 
@@ -27,7 +30,7 @@ describe('SarifReport', () => {
 });
 
 function loadSarifFile(organization: string, repo: string, filename: string) {
-  const file = path.join(__dirname, '..', '..', 'samples', 'sarif', organization, repo, filename);
+  const file = path.join(getSampleSarifDirectory(), organization, repo, filename);
   const data = fs.readFileSync(file, 'utf8');
   return JSON.parse(data);
 }

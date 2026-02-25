@@ -1,5 +1,6 @@
 import * as fs from 'fs';
-import { expect } from 'chai';
+import { describe, expect, it } from 'vitest';
+
 import Template from './Template';
 import { getSampleReportJsonDirectory, getTestDirectoryFilePath } from '../testUtils';
 
@@ -26,7 +27,6 @@ describe.skip('Template', () => {
       expect(fileContent).to.equal(expectedContent);
     });
   });
-
 });
 
 

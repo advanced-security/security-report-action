@@ -105,7 +105,7 @@ export type SarifVersionControlProvenance = {
 
 export type SarifToolExtension = {
   name: string,
-  semanticVversion: string,
+  semanticVersion: string,
   rules?: SarifRule[]
 }
 
@@ -123,7 +123,7 @@ export type SarifRule = {
     precision: string,
     kind: string,
     queryURI: string,
-    'security-secverity': string,
+    'security-severity': string,
 
   },
   defaultConfiguration: {

@@ -10,6 +10,7 @@ import {
 
 import Vulnerability from './Vulnerability';
 import DependencySet from './DependencySet';
+import { Logger } from '../logging/Logger';
 
 type Repo = {
   owner: string,
@@ -21,8 +22,11 @@ export default class GitHubDependencies {
 
   private readonly octokit: Octokit;
 
-  constructor(octokit) {
+  private readonly logger: Logger;
+
+  constructor(octokit: Octokit, logger: Logger) {
     this.octokit = octokit;
+    this.logger = logger;
   }
 
   async getAllVulnerabilities(repo: Repo): Promise<Vulnerability[]> {
@@ -72,7 +76,7 @@ export default class GitHubDependencies {
 
     let hasNextPage = false;
     do {
-      const graphqlParameters = buildGraphQLParameters(query, parameters, headers)
+      const graphqlParameters = buildGraphQLParameters(query, queryParameters, headers)
         , queryResult = await octokit.graphql(graphqlParameters)
       ;
 
