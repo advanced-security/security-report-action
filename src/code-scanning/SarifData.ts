@@ -105,7 +105,7 @@ export type SarifVersionControlProvenance = {
 
 export type SarifToolExtension = {
   name: string,
-  semanticVversion: string,
+  semanticVersion: string,
   rules?: SarifRule[]
 }
 

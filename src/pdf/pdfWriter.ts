@@ -13,8 +13,6 @@ export async function createPDF(html: string, file: string): Promise<string> {
     cacheDir,
   });
 
-  console.log(JSON.stringify(installedBrowser, null, 2));
-
   const executablePath = path.join(installedBrowser.path, getChromeLinux64Path());
   const executableStats = fs.statSync(executablePath);
   if (!executableStats.isFile()) {
