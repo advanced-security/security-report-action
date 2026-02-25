@@ -1,6 +1,5 @@
 import * as core from '@actions/core';
 import { Logger } from './Logger';
-import { log } from 'console';
 
 const enum LEVEL {
   DEBUG = 'debug',

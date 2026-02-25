@@ -123,7 +123,7 @@ export type SarifRule = {
     precision: string,
     kind: string,
     queryURI: string,
-    'security-secverity': string,
+    'security-severity': string,
 
   },
   defaultConfiguration: {
