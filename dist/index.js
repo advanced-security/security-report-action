@@ -4232,7 +4232,7 @@ module.exports = __toCommonJS(dist_src_exports);
 var import_universal_user_agent = __nccwpck_require__(45030);
 
 // pkg/dist-src/version.js
-var VERSION = "9.0.5";
+var VERSION = "9.0.6";
 
 // pkg/dist-src/defaults.js
 var userAgent = `octokit-endpoint.js/${VERSION} ${(0, import_universal_user_agent.getUserAgent)()}`;
@@ -4337,9 +4337,9 @@ function addQueryParameters(url, parameters) {
 }
 
 // pkg/dist-src/util/extract-url-variable-names.js
-var urlVariableRegex = /\{[^}]+\}/g;
+var urlVariableRegex = /\{[^{}}]+\}/g;
 function removeNonChars(variableName) {
-  return variableName.replace(/^\W+|\W+$/g, "").split(/,/);
+  return variableName.replace(/(?:^\W+)|(?:(?<!\W)\W+$)/g, "").split(/,/);
 }
 function extractUrlVariableNames(url) {
   const matches = url.match(urlVariableRegex);
@@ -4525,7 +4525,7 @@ function parse(options) {
     }
     if (url.endsWith("/graphql")) {
       if (options.mediaType.previews?.length) {
-        const previewsFromAcceptHeader = headers.accept.match(/[\w-]+(?=-preview)/g) || [];
+        const previewsFromAcceptHeader = headers.accept.match(/(?<![\w-])[\w-]+(?=-preview)/g) || [];
         headers.accept = previewsFromAcceptHeader.concat(options.mediaType.previews).map((preview) => {
           const format = options.mediaType.format ? `.${options.mediaType.format}` : "+json";
           return `application/vnd.github.${preview}-preview${format}`;
@@ -4774,7 +4774,7 @@ __export(dist_src_exports, {
 module.exports = __toCommonJS(dist_src_exports);
 
 // pkg/dist-src/version.js
-var VERSION = "9.2.1";
+var VERSION = "9.2.2";
 
 // pkg/dist-src/normalize-paginated-list-response.js
 function normalizePaginatedListResponse(response) {
@@ -4822,7 +4822,7 @@ function iterator(octokit, route, parameters) {
           const response = await requestMethod({ method, url, headers });
           const normalizedResponse = normalizePaginatedListResponse(response);
           url = ((normalizedResponse.headers.link || "").match(
-            /<([^>]+)>;\s*rel="next"/
+            /<([^<>]+)>;\s*rel="next"/
           ) || [])[1];
           return { value: normalizedResponse };
         } catch (error) {
@@ -7434,7 +7434,7 @@ var RequestError = class extends Error {
     if (options.request.headers.authorization) {
       requestCopy.headers = Object.assign({}, options.request.headers, {
         authorization: options.request.headers.authorization.replace(
-          / .*$/,
+          /(?<! ) .*$/,
           " [REDACTED]"
         )
       });
@@ -7502,7 +7502,7 @@ var import_endpoint = __nccwpck_require__(59440);
 var import_universal_user_agent = __nccwpck_require__(45030);
 
 // pkg/dist-src/version.js
-var VERSION = "8.4.0";
+var VERSION = "8.4.1";
 
 // pkg/dist-src/is-plain-object.js
 function isPlainObject(value) {
@@ -7561,7 +7561,7 @@ function fetchWrapper(requestOptions) {
       headers[keyAndValue[0]] = keyAndValue[1];
     }
     if ("deprecation" in headers) {
-      const matches = headers.link && headers.link.match(/<([^>]+)>; rel="deprecation"/);
+      const matches = headers.link && headers.link.match(/<([^<>]+)>; rel="deprecation"/);
       const deprecationLink = matches && matches.pop();
       log.warn(
         `[@octokit/request] "${requestOptions.method} ${requestOptions.url}" is deprecated. It is scheduled to be removed on ${headers.sunset}${deprecationLink ? `. See ${deprecationLink}` : ""}`
@@ -15770,6 +15770,38 @@ function readInt32LE (buffer, offset) {
   return toBuffer(buffer).readInt32LE(offset)
 }
 
+function writeDoubleBE (buffer, value, offset) {
+  return toBuffer(buffer).writeDoubleBE(value, offset)
+}
+
+function writeFloatBE (buffer, value, offset) {
+  return toBuffer(buffer).writeFloatBE(value, offset)
+}
+
+function writeUInt32BE (buffer, value, offset) {
+  return toBuffer(buffer).writeUInt32BE(value, offset)
+}
+
+function writeInt32BE (buffer, value, offset) {
+  return toBuffer(buffer).writeInt32BE(value, offset)
+}
+
+function readDoubleBE (buffer, offset) {
+  return toBuffer(buffer).readDoubleBE(offset)
+}
+
+function readFloatBE (buffer, offset) {
+  return toBuffer(buffer).readFloatBE(offset)
+}
+
+function readUInt32BE (buffer, offset) {
+  return toBuffer(buffer).readUInt32BE(offset)
+}
+
+function readInt32BE (buffer, offset) {
+  return toBuffer(buffer).readInt32BE(offset)
+}
+
 module.exports = {
   isBuffer,
   isEncoding,
@@ -15799,7 +15831,16 @@ module.exports = {
   readDoubleLE,
   readFloatLE,
   readUInt32LE,
-  readInt32LE
+  readInt32LE,
+  writeDoubleBE,
+  writeFloatBE,
+  writeUInt32BE,
+  writeInt32BE,
+  readDoubleBE,
+  readFloatBE,
+  readUInt32BE,
+  readInt32BE
+
 }
 
 
@@ -15831,6 +15872,9 @@ const fsStat = (0, util_1.promisify)(fs_1.stat);
 const fsOpen = (0, util_1.promisify)(fs_1.open);
 const fsClose = (0, util_1.promisify)(fs_1.close);
 const fsUnlink = (0, util_1.promisify)(fs_1.unlink);
+const defaultClientOptions = {
+    allowSeparateTransferHost: true
+};
 const LIST_COMMANDS_DEFAULT = () => ["LIST -a", "LIST"];
 const LIST_COMMANDS_MLSD = () => ["MLSD", "LIST -a", "LIST"];
 /**
@@ -15842,10 +15886,13 @@ class Client {
      *
      * @param timeout  Timeout in milliseconds, use 0 for no timeout. Optional, default is 30 seconds.
      */
-    constructor(timeout = 30000) {
+    constructor(timeout = 30000, options = defaultClientOptions) {
         this.availableListCommands = LIST_COMMANDS_DEFAULT();
         this.ftp = new FtpContext_1.FTPContext(timeout);
-        this.prepareTransfer = this._enterFirstCompatibleMode([transfer_1.enterPassiveModeIPv6, transfer_1.enterPassiveModeIPv4]);
+        this.prepareTransfer = this._enterFirstCompatibleMode([
+            transfer_1.enterPassiveModeIPv6,
+            options.allowSeparateTransferHost ? transfer_1.enterPassiveModeIPv4 : transfer_1.enterPassiveModeIPv4_forceControlHostIP
+        ]);
         this.parseList = parseList_1.parseList;
         this._progressTracker = new ProgressTracker_1.ProgressTracker();
     }
@@ -16428,6 +16475,12 @@ class Client {
     async _downloadFromWorkingDir(localDirPath) {
         await ensureLocalDirectory(localDirPath);
         for (const file of await this.list()) {
+            const hasInvalidName = !file.name || (0, path_1.basename)(file.name) !== file.name;
+            if (hasInvalidName) {
+                const safeName = JSON.stringify(file.name);
+                this.ftp.log(`Invalid filename from server listing, will skip file. (${safeName})`);
+                continue;
+            }
             const localPath = (0, path_1.join)(localDirPath, file.name);
             if (file.isDirectory) {
                 await this.cd(file.name);
@@ -16508,7 +16561,7 @@ class Client {
                 try {
                     const res = await strategy(ftp);
                     ftp.log("Optimal transfer strategy found.");
-                    this.prepareTransfer = strategy; // eslint-disable-line require-atomic-updates
+                    this.prepareTransfer = strategy;
                     return res;
                 }
                 catch (err) {
@@ -16566,7 +16619,7 @@ async function ensureLocalDirectory(path) {
     try {
         await fsStat(path);
     }
-    catch (err) {
+    catch (_a) {
         await fsMkDir(path, { recursive: true });
     }
 }
@@ -16574,7 +16627,7 @@ async function ignoreError(func) {
     try {
         return await func();
     }
-    catch (err) {
+    catch (_a) {
         // Ignore
         return undefined;
     }
@@ -16864,6 +16917,10 @@ class FTPContext {
      * Send an FTP command without waiting for or handling the result.
      */
     send(command) {
+        // Reject control character injection attempts.
+        if (/[\r\n\0]/.test(command)) {
+            throw new Error(`Invalid command: Contains control characters. (${command})`);
+        }
         const containsPassword = command.startsWith("PASS");
         const message = containsPassword ? "> PASS ###" : `> ${command}`;
         this.log(message);
@@ -17219,7 +17276,10 @@ Object.defineProperty(exports, "enterPassiveModeIPv6", ({ enumerable: true, get:
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.ipIsPrivateV4Address = exports.upgradeSocket = exports.describeAddress = exports.describeTLS = void 0;
+exports.describeTLS = describeTLS;
+exports.describeAddress = describeAddress;
+exports.upgradeSocket = upgradeSocket;
+exports.ipIsPrivateV4Address = ipIsPrivateV4Address;
 const tls_1 = __nccwpck_require__(24404);
 /**
  * Returns a string describing the encryption on a given socket instance.
@@ -17231,7 +17291,6 @@ function describeTLS(socket) {
     }
     return "No encryption";
 }
-exports.describeTLS = describeTLS;
 /**
  * Returns a string describing the remote address of a socket.
  */
@@ -17241,7 +17300,6 @@ function describeAddress(socket) {
     }
     return `${socket.remoteAddress}:${socket.remotePort}`;
 }
-exports.describeAddress = describeAddress;
 /**
  * Upgrade a socket connection with TLS.
  */
@@ -17265,7 +17323,6 @@ function upgradeSocket(socket, options) {
         });
     });
 }
-exports.upgradeSocket = upgradeSocket;
 /**
  * Returns true if an IP is a private address according to https://tools.ietf.org/html/rfc1918#section-3.
  * This will handle IPv4-mapped IPv6 addresses correctly but return false for all other IPv6 addresses.
@@ -17283,7 +17340,6 @@ function ipIsPrivateV4Address(ip = "") {
         || (octets[0] === 192 && octets[1] === 168) // 192.168.0.0 - 192.168.255.255
         || ip === "127.0.0.1";
 }
-exports.ipIsPrivateV4Address = ipIsPrivateV4Address;
 
 
 /***/ }),
@@ -17294,7 +17350,11 @@ exports.ipIsPrivateV4Address = ipIsPrivateV4Address;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.positiveIntermediate = exports.positiveCompletion = exports.isMultiline = exports.isSingleLine = exports.parseControlResponse = void 0;
+exports.parseControlResponse = parseControlResponse;
+exports.isSingleLine = isSingleLine;
+exports.isMultiline = isMultiline;
+exports.positiveCompletion = positiveCompletion;
+exports.positiveIntermediate = positiveIntermediate;
 const LF = "\n";
 /**
  * Parse an FTP control response as a collection of messages. A message is a complete
@@ -17333,29 +17393,24 @@ function parseControlResponse(text) {
     const rest = tokenRegex ? lines.slice(startAt).join(LF) + LF : "";
     return { messages, rest };
 }
-exports.parseControlResponse = parseControlResponse;
 function isSingleLine(line) {
     return /^\d\d\d(?:$| )/.test(line);
 }
-exports.isSingleLine = isSingleLine;
 function isMultiline(line) {
     return /^\d\d\d-/.test(line);
 }
-exports.isMultiline = isMultiline;
 /**
  * Return true if an FTP return code describes a positive completion.
  */
 function positiveCompletion(code) {
     return code >= 200 && code < 300;
 }
-exports.positiveCompletion = positiveCompletion;
 /**
  * Return true if an FTP return code describes a positive intermediate response.
  */
 function positiveIntermediate(code) {
     return code >= 300 && code < 400;
 }
-exports.positiveIntermediate = positiveIntermediate;
 function isNotBlank(str) {
     return str.trim() !== "";
 }
@@ -17384,15 +17439,25 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.parseList = void 0;
+exports.parseList = parseList;
 const dosParser = __importStar(__nccwpck_require__(96199));
 const unixParser = __importStar(__nccwpck_require__(92622));
 const mlsdParser = __importStar(__nccwpck_require__(48157));
@@ -17436,7 +17501,6 @@ function parseList(rawList) {
         .filter((info) => info !== undefined);
     return parser.transformList(files);
 }
-exports.parseList = parseList;
 
 
 /***/ }),
@@ -17447,7 +17511,9 @@ exports.parseList = parseList;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.transformList = exports.parseLine = exports.testLine = void 0;
+exports.testLine = testLine;
+exports.parseLine = parseLine;
+exports.transformList = transformList;
 const FileInfo_1 = __nccwpck_require__(80202);
 /**
  * This parser is based on the FTP client library source code in Apache Commons Net provided
@@ -17467,7 +17533,6 @@ const RE_LINE = new RegExp("(\\S+)\\s+(\\S+)\\s+" // MM-dd-yy whitespace hh:mma|
 function testLine(line) {
     return /^\d{2}/.test(line) && RE_LINE.test(line);
 }
-exports.testLine = testLine;
 /**
  * Parse a single line of a DOS-style directory listing.
  */
@@ -17493,11 +17558,9 @@ function parseLine(line) {
     file.rawModifiedAt = groups[1] + " " + groups[2];
     return file;
 }
-exports.parseLine = parseLine;
 function transformList(files) {
     return files;
 }
-exports.transformList = transformList;
 
 
 /***/ }),
@@ -17508,7 +17571,10 @@ exports.transformList = transformList;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.parseMLSxDate = exports.transformList = exports.parseLine = exports.testLine = void 0;
+exports.testLine = testLine;
+exports.parseLine = parseLine;
+exports.transformList = transformList;
+exports.parseMLSxDate = parseMLSxDate;
 const FileInfo_1 = __nccwpck_require__(80202);
 function parseSize(value, info) {
     info.size = parseInt(value, 10);
@@ -17621,7 +17687,6 @@ function splitStringOnce(str, delimiter) {
 function testLine(line) {
     return /^\S+=\S+;/.test(line) || line.startsWith(" ");
 }
-exports.testLine = testLine;
 /**
  * Parse single line as MLSD listing, see specification at https://tools.ietf.org/html/rfc3659#section-7.
  */
@@ -17648,7 +17713,6 @@ function parseLine(line) {
     }
     return info;
 }
-exports.parseLine = parseLine;
 function transformList(files) {
     // Create a map of all files that are not symbolic links by their unique ID
     const nonLinksByID = new Map();
@@ -17676,7 +17740,6 @@ function transformList(files) {
     }
     return resolvedFiles;
 }
-exports.transformList = transformList;
 /**
  * Parse date as specified in https://tools.ietf.org/html/rfc3659#section-2.3.
  *
@@ -17693,7 +17756,6 @@ function parseMLSxDate(fact) {
     +fact.slice(15, 18) // Milliseconds
     ));
 }
-exports.parseMLSxDate = parseMLSxDate;
 
 
 /***/ }),
@@ -17704,7 +17766,9 @@ exports.parseMLSxDate = parseMLSxDate;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.transformList = exports.parseLine = exports.testLine = void 0;
+exports.testLine = testLine;
+exports.parseLine = parseLine;
+exports.transformList = transformList;
 const FileInfo_1 = __nccwpck_require__(80202);
 const JA_MONTH = "\u6708";
 const JA_DAY = "\u65e5";
@@ -17781,7 +17845,6 @@ const RE_LINE = new RegExp("([bcdelfmpSs-])" // file type
 function testLine(line) {
     return RE_LINE.test(line);
 }
-exports.testLine = testLine;
 /**
  * Parse a single line of a Unix-style directory listing.
  */
@@ -17839,11 +17902,9 @@ function parseLine(line) {
     }
     return file;
 }
-exports.parseLine = parseLine;
 function transformList(files) {
     return files;
 }
-exports.transformList = transformList;
 function parseMode(r, w, x) {
     let value = 0;
     if (r !== "-") {
@@ -17868,7 +17929,14 @@ function parseMode(r, w, x) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.downloadTo = exports.uploadFrom = exports.connectForPassiveTransfer = exports.parsePasvResponse = exports.enterPassiveModeIPv4 = exports.parseEpsvResponse = exports.enterPassiveModeIPv6 = void 0;
+exports.enterPassiveModeIPv6 = enterPassiveModeIPv6;
+exports.parseEpsvResponse = parseEpsvResponse;
+exports.enterPassiveModeIPv4 = enterPassiveModeIPv4;
+exports.enterPassiveModeIPv4_forceControlHostIP = enterPassiveModeIPv4_forceControlHostIP;
+exports.parsePasvResponse = parsePasvResponse;
+exports.connectForPassiveTransfer = connectForPassiveTransfer;
+exports.uploadFrom = uploadFrom;
+exports.downloadTo = downloadTo;
 const netUtils_1 = __nccwpck_require__(76288);
 const stream_1 = __nccwpck_require__(12781);
 const tls_1 = __nccwpck_require__(24404);
@@ -17889,7 +17957,6 @@ async function enterPassiveModeIPv6(ftp) {
     await connectForPassiveTransfer(controlHost, port, ftp);
     return res;
 }
-exports.enterPassiveModeIPv6 = enterPassiveModeIPv6;
 /**
  * Parse an EPSV response. Returns only the port as in EPSV the host of the control connection is used.
  */
@@ -17906,7 +17973,6 @@ function parseEpsvResponse(message) {
     }
     return port;
 }
-exports.parseEpsvResponse = parseEpsvResponse;
 /**
  * Prepare a data socket using passive mode over IPv4.
  */
@@ -17927,7 +17993,24 @@ async function enterPassiveModeIPv4(ftp) {
     await connectForPassiveTransfer(target.host, target.port, ftp);
     return res;
 }
-exports.enterPassiveModeIPv4 = enterPassiveModeIPv4;
+/**
+ * Prepare a data socket using passive mode over IPv4. Ignore the IP provided by the PASV response,
+ * and use the control host IP. This is the same behaviour as with the more modern variant EPSV. Use
+ * this to fix issues around NAT or provide more security by preventing FTP bounce attacks.
+ */
+async function enterPassiveModeIPv4_forceControlHostIP(ftp) {
+    const res = await ftp.request("PASV");
+    const target = parsePasvResponse(res.message);
+    if (!target) {
+        throw new Error("Can't parse PASV response: " + res.message);
+    }
+    const controlHost = ftp.socket.remoteAddress;
+    if (controlHost === undefined) {
+        throw new Error("Control socket is disconnected, can't get remote address.");
+    }
+    await connectForPassiveTransfer(controlHost, target.port, ftp);
+    return res;
+}
 /**
  * Parse a PASV response.
  */
@@ -17942,7 +18025,6 @@ function parsePasvResponse(message) {
         port: (parseInt(groups[2], 10) & 255) * 256 + (parseInt(groups[3], 10) & 255)
     };
 }
-exports.parsePasvResponse = parsePasvResponse;
 function connectForPassiveTransfer(host, port, ftp) {
     return new Promise((resolve, reject) => {
         let socket = ftp._newSocket();
@@ -17984,7 +18066,6 @@ function connectForPassiveTransfer(host, port, ftp) {
         });
     });
 }
-exports.connectForPassiveTransfer = connectForPassiveTransfer;
 /**
  * Helps resolving/rejecting transfers.
  *
@@ -18109,7 +18190,6 @@ function uploadFrom(source, config) {
         // Ignore all other positive preliminary response codes (< 200)
     });
 }
-exports.uploadFrom = uploadFrom;
 function downloadTo(destination, config) {
     if (!config.ftp.dataSocket) {
         throw new Error("Download will be initiated but no data connection is available.");
@@ -18148,7 +18228,6 @@ function downloadTo(destination, config) {
         // Ignore all other positive preliminary response codes (< 200)
     });
 }
-exports.downloadTo = downloadTo;
 /**
  * Calls a function immediately if a condition is met or subscribes to an event and calls
  * it once the event is emitted.
@@ -18735,8 +18814,8 @@ class BidiServer extends EventEmitter_js_1.EventEmitter {
         this.#transport = bidiTransport;
         this.#transport.setOnMessage(this.#handleIncomingMessage);
         this.#eventManager = new EventManager_js_1.EventManager(this.#browsingContextStorage);
-        const networkStorage = new NetworkStorage_js_1.NetworkStorage(this.#eventManager, browserCdpClient, logger);
-        new CdpTargetManager_js_1.CdpTargetManager(cdpConnection, browserCdpClient, selfTargetId, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, networkStorage, this.#preloadScriptStorage, options?.acceptInsecureCerts ?? false, defaultUserContextId, logger);
+        const networkStorage = new NetworkStorage_js_1.NetworkStorage(this.#eventManager, this.#browsingContextStorage, browserCdpClient, logger);
+        new CdpTargetManager_js_1.CdpTargetManager(cdpConnection, browserCdpClient, selfTargetId, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, networkStorage, this.#preloadScriptStorage, defaultUserContextId, options?.unhandledPromptBehavior, logger);
         this.#commandProcessor = new CommandProcessor_js_1.CommandProcessor(cdpConnection, browserCdpClient, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, this.#preloadScriptStorage, networkStorage, parser, this.#logger);
         this.#eventManager.on("event" /* EventManagerEvents.Event */, ({ message, event }) => {
             this.emitOutgoingMessage(message, event);
@@ -18756,6 +18835,10 @@ class BidiServer extends EventEmitter_js_1.EventEmitter {
         const [{ browserContextIds }, { targetInfos }] = await Promise.all([
             browserCdpClient.sendCommand('Target.getBrowserContexts'),
             browserCdpClient.sendCommand('Target.getTargets'),
+            // This is required to ignore certificate errors when service worker is fetched.
+            browserCdpClient.sendCommand('Security.setIgnoreCertificateErrors', {
+                ignore: options?.acceptInsecureCerts ?? false,
+            }),
         ]);
         let defaultUserContextId = 'default';
         for (const info of targetInfos) {
@@ -18856,7 +18939,7 @@ class CommandProcessor extends EventEmitter_js_1.EventEmitter {
         this.#logger = logger;
         // keep-sorted start block=yes
         this.#browserProcessor = new BrowserProcessor_js_1.BrowserProcessor(browserCdpClient);
-        this.#browsingContextProcessor = new BrowsingContextProcessor_js_1.BrowsingContextProcessor(browserCdpClient, browsingContextStorage);
+        this.#browsingContextProcessor = new BrowsingContextProcessor_js_1.BrowsingContextProcessor(browserCdpClient, browsingContextStorage, eventManager);
         this.#cdpProcessor = new CdpProcessor_js_1.CdpProcessor(browsingContextStorage, realmStorage, cdpConnection, browserCdpClient);
         this.#inputProcessor = new InputProcessor_js_1.InputProcessor(browsingContextStorage, realmStorage);
         this.#networkProcessor = new NetworkProcessor_js_1.NetworkProcessor(browsingContextStorage, networkStorage);
@@ -18943,6 +19026,8 @@ class CommandProcessor extends EventEmitter_js_1.EventEmitter {
                 return await this.#networkProcessor.provideResponse(this.#parser.parseProvideResponseParams(command.params));
             case 'network.removeIntercept':
                 return await this.#networkProcessor.removeIntercept(this.#parser.parseRemoveInterceptParams(command.params));
+            case 'network.setCacheBehavior':
+                throw new protocol_js_1.UnknownErrorException("Method 'network.setCacheBehavior' is not implemented.");
             // keep-sorted end
             // Permissions domain
             // keep-sorted start block=yes
@@ -18967,7 +19052,7 @@ class CommandProcessor extends EventEmitter_js_1.EventEmitter {
             // Session domain
             // keep-sorted start block=yes
             case 'session.new':
-                return await this.#sessionProcessor.create(command.params);
+                return await this.#sessionProcessor.new(command.params);
             case 'session.status':
                 return this.#sessionProcessor.status();
             case 'session.subscribe':
@@ -19262,25 +19347,29 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CdpTarget = void 0;
 const chromium_bidi_js_1 = __nccwpck_require__(60721);
 const Deferred_js_1 = __nccwpck_require__(1104);
+const log_js_1 = __nccwpck_require__(5598);
+const BrowsingContextImpl_js_1 = __nccwpck_require__(38878);
 const LogManager_js_1 = __nccwpck_require__(79948);
 class CdpTarget {
     #id;
     #cdpClient;
     #browserCdpClient;
+    #realmStorage;
     #eventManager;
     #preloadScriptStorage;
     #browsingContextStorage;
     #networkStorage;
     #unblocked = new Deferred_js_1.Deferred();
-    #acceptInsecureCerts;
+    #unhandledPromptBehavior;
+    #logger;
     #networkDomainEnabled = false;
     #fetchDomainStages = {
         request: false,
         response: false,
         auth: false,
     };
-    static create(targetId, cdpClient, browserCdpClient, realmStorage, eventManager, preloadScriptStorage, browsingContextStorage, networkStorage, acceptInsecureCerts, logger) {
-        const cdpTarget = new CdpTarget(targetId, cdpClient, browserCdpClient, eventManager, preloadScriptStorage, browsingContextStorage, networkStorage, acceptInsecureCerts);
+    static create(targetId, cdpClient, browserCdpClient, realmStorage, eventManager, preloadScriptStorage, browsingContextStorage, networkStorage, unhandledPromptBehavior, logger) {
+        const cdpTarget = new CdpTarget(targetId, cdpClient, browserCdpClient, eventManager, realmStorage, preloadScriptStorage, browsingContextStorage, networkStorage, unhandledPromptBehavior, logger);
         LogManager_js_1.LogManager.create(cdpTarget, realmStorage, eventManager, logger);
         cdpTarget.#setEventListeners();
         // No need to await.
@@ -19288,15 +19377,17 @@ class CdpTarget {
         void cdpTarget.#unblock();
         return cdpTarget;
     }
-    constructor(targetId, cdpClient, browserCdpClient, eventManager, preloadScriptStorage, browsingContextStorage, networkStorage, acceptInsecureCerts) {
+    constructor(targetId, cdpClient, browserCdpClient, eventManager, realmStorage, preloadScriptStorage, browsingContextStorage, networkStorage, unhandledPromptBehavior, logger) {
         this.#id = targetId;
         this.#cdpClient = cdpClient;
         this.#browserCdpClient = browserCdpClient;
         this.#eventManager = eventManager;
+        this.#realmStorage = realmStorage;
         this.#preloadScriptStorage = preloadScriptStorage;
         this.#networkStorage = networkStorage;
         this.#browsingContextStorage = browsingContextStorage;
-        this.#acceptInsecureCerts = acceptInsecureCerts;
+        this.#unhandledPromptBehavior = unhandledPromptBehavior;
+        this.#logger = logger;
     }
     /** Returns a deferred that resolves when the target is unblocked. */
     get unblocked() {
@@ -19322,14 +19413,21 @@ class CdpTarget {
     async #unblock() {
         try {
             await Promise.all([
-                this.#cdpClient.sendCommand('Runtime.enable'),
                 this.#cdpClient.sendCommand('Page.enable'),
+                // There can be some existing frames in the target, if reconnecting to an
+                // existing browser instance, e.g. via Puppeteer. Need to restore the browsing
+                // contexts for the frames to correctly handle further events, like
+                // `Runtime.executionContextCreated`.
+                // It's important to schedule this task together with enabling domains commands to
+                // prepare the tree before the events (e.g. Runtime.executionContextCreated) start
+                // coming.
+                // https://github.com/GoogleChromeLabs/chromium-bidi/issues/2282
+                this.#cdpClient
+                    .sendCommand('Page.getFrameTree')
+                    .then((frameTree) => this.#restoreFrameTreeState(frameTree.frameTree)),
+                this.#cdpClient.sendCommand('Runtime.enable'),
                 this.#cdpClient.sendCommand('Page.setLifecycleEventsEnabled', {
                     enabled: true,
-                }),
-                // Set ignore certificate errors for each target.
-                this.#cdpClient.sendCommand('Security.setIgnoreCertificateErrors', {
-                    ignore: this.#acceptInsecureCerts,
                 }),
                 this.toggleNetworkIfNeeded(),
                 this.#cdpClient.sendCommand('Target.setAutoAttach', {
@@ -19342,6 +19440,7 @@ class CdpTarget {
             ]);
         }
         catch (error) {
+            this.#logger?.(log_js_1.LogType.debugError, 'Failed to unblock target', error);
             // The target might have been closed before the initialization finished.
             if (!this.#cdpClient.isCloseError(error)) {
                 this.#unblocked.resolve({
@@ -19355,6 +19454,26 @@ class CdpTarget {
             kind: 'success',
             value: undefined,
         });
+    }
+    #restoreFrameTreeState(frameTree) {
+        const frame = frameTree.frame;
+        const maybeContext = this.#browsingContextStorage.findContext(frame.id);
+        if (maybeContext !== undefined) {
+            // Restoring parent of already known browsing context. This means the target is
+            // OOPiF and the BiDi session was connected to already existing browser instance.
+            if (maybeContext.parentId === null &&
+                frame.parentId !== null &&
+                frame.parentId !== undefined) {
+                maybeContext.parentId = frame.parentId;
+            }
+        }
+        if (maybeContext === undefined && frame.parentId !== undefined) {
+            // Restore not yet known nested frames. The top-level frame is created when the
+            // target is attached.
+            const parentBrowsingContext = this.#browsingContextStorage.getContext(frame.parentId);
+            BrowsingContextImpl_js_1.BrowsingContextImpl.create(frame.id, frame.parentId, parentBrowsingContext.userContext, parentBrowsingContext.cdpTarget, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, frame.url, undefined, this.#unhandledPromptBehavior, this.#logger);
+        }
+        frameTree.childFrames?.map((frameTree) => this.#restoreFrameTreeState(frameTree));
     }
     async toggleFetchIfNeeded() {
         const stages = this.#networkStorage.getInterceptionStages(this.topLevelId);
@@ -19480,19 +19599,20 @@ const cdpToBidiTargetTypes = {
 class CdpTargetManager {
     #browserCdpClient;
     #cdpConnection;
+    #targetKeysToBeIgnoredByAutoAttach = new Set();
     #selfTargetId;
     #eventManager;
     #browsingContextStorage;
     #networkStorage;
-    #acceptInsecureCerts;
     #preloadScriptStorage;
     #realmStorage;
     #defaultUserContextId;
     #logger;
-    constructor(cdpConnection, browserCdpClient, selfTargetId, eventManager, browsingContextStorage, realmStorage, networkStorage, preloadScriptStorage, acceptInsecureCerts, defaultUserContextId, logger) {
-        this.#acceptInsecureCerts = acceptInsecureCerts;
+    #unhandledPromptBehavior;
+    constructor(cdpConnection, browserCdpClient, selfTargetId, eventManager, browsingContextStorage, realmStorage, networkStorage, preloadScriptStorage, defaultUserContextId, unhandledPromptBehavior, logger) {
         this.#cdpConnection = cdpConnection;
         this.#browserCdpClient = browserCdpClient;
+        this.#targetKeysToBeIgnoredByAutoAttach.add(selfTargetId);
         this.#selfTargetId = selfTargetId;
         this.#eventManager = eventManager;
         this.#browsingContextStorage = browsingContextStorage;
@@ -19500,6 +19620,7 @@ class CdpTargetManager {
         this.#networkStorage = networkStorage;
         this.#realmStorage = realmStorage;
         this.#defaultUserContextId = defaultUserContextId;
+        this.#unhandledPromptBehavior = unhandledPromptBehavior;
         this.#logger = logger;
         this.#setEventListeners(browserCdpClient);
     }
@@ -19522,7 +19643,10 @@ class CdpTargetManager {
     #handleFrameAttachedEvent(params) {
         const parentBrowsingContext = this.#browsingContextStorage.findContext(params.parentFrameId);
         if (parentBrowsingContext !== undefined) {
-            BrowsingContextImpl_js_1.BrowsingContextImpl.create(params.frameId, params.parentFrameId, parentBrowsingContext.userContext, parentBrowsingContext.cdpTarget, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, this.#logger);
+            BrowsingContextImpl_js_1.BrowsingContextImpl.create(params.frameId, params.parentFrameId, parentBrowsingContext.userContext, parentBrowsingContext.cdpTarget, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, 
+            // At this point, we don't know the URL of the frame yet, so it will be updated
+            // later.
+            'about:blank', undefined, this.#unhandledPromptBehavior, this.#logger);
         }
     }
     #handleFrameDetachedEvent(params) {
@@ -19535,15 +19659,41 @@ class CdpTargetManager {
     #handleAttachedToTargetEvent(params, parentSessionCdpClient) {
         const { sessionId, targetInfo } = params;
         const targetCdpClient = this.#cdpConnection.getCdpClient(sessionId);
+        const detach = async () => {
+            // Detaches and resumes the target suppressing errors.
+            await targetCdpClient
+                .sendCommand('Runtime.runIfWaitingForDebugger')
+                .then(() => parentSessionCdpClient.sendCommand('Target.detachFromTarget', params))
+                .catch((error) => this.#logger?.(log_js_1.LogType.debugError, error));
+        };
+        if (this.#selfTargetId !== targetInfo.targetId) {
+            // Service workers are special case because they attach to the
+            // browser target and the page target (so twice per worker) during
+            // the regular auto-attach and might hang if the CDP session on
+            // the browser level is not detached. The logic to detach the
+            // right session is handled in the switch below.
+            const targetKey = targetInfo.type === 'service_worker'
+                ? `${parentSessionCdpClient.sessionId}_${targetInfo.targetId}`
+                : targetInfo.targetId;
+            // Mapper generally only needs one session per target. If we
+            // receive additional auto-attached sessions, that is very likely
+            // coming from custom CDP sessions.
+            if (this.#targetKeysToBeIgnoredByAutoAttach.has(targetKey)) {
+                // Return to leave the session untouched.
+                return;
+            }
+            this.#targetKeysToBeIgnoredByAutoAttach.add(targetKey);
+        }
         switch (targetInfo.type) {
             case 'page':
             case 'iframe': {
-                if (targetInfo.targetId === this.#selfTargetId) {
-                    break;
+                if (this.#selfTargetId === targetInfo.targetId) {
+                    void detach();
+                    return;
                 }
                 const cdpTarget = this.#createCdpTarget(targetCdpClient, targetInfo);
                 const maybeContext = this.#browsingContextStorage.findContext(targetInfo.targetId);
-                if (maybeContext) {
+                if (maybeContext && targetInfo.type === 'iframe') {
                     // OOPiF.
                     maybeContext.updateCdpTarget(cdpTarget);
                 }
@@ -19553,7 +19703,16 @@ class CdpTargetManager {
                         ? targetInfo.browserContextId
                         : 'default';
                     // New context.
-                    BrowsingContextImpl_js_1.BrowsingContextImpl.create(targetInfo.targetId, null, userContext, cdpTarget, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, this.#logger);
+                    BrowsingContextImpl_js_1.BrowsingContextImpl.create(targetInfo.targetId, null, userContext, cdpTarget, this.#eventManager, this.#browsingContextStorage, this.#realmStorage, 
+                    // Hack: when a new target created, CDP emits targetInfoChanged with an empty
+                    // url, and navigates it to about:blank later. When the event is emitted for
+                    // an existing target (reconnect), the url is already known, and navigation
+                    // events will not be emitted anymore. Replacing empty url with `about:blank`
+                    // allows to handle both cases in the same way.
+                    // "7.3.2.1 Creating browsing contexts".
+                    // https://html.spec.whatwg.org/multipage/document-sequences.html#creating-browsing-contexts
+                    // TODO: check who to deal with non-null creator and its `creatorOrigin`.
+                    targetInfo.url === '' ? 'about:blank' : targetInfo.url, targetInfo.openerFrameId ?? targetInfo.openerId, this.#unhandledPromptBehavior, this.#logger);
                 }
                 return;
             }
@@ -19564,7 +19723,8 @@ class CdpTargetManager {
                 });
                 // If there is no browsing context, this worker is already terminated.
                 if (!realm) {
-                    break;
+                    void detach();
+                    return;
                 }
                 const cdpTarget = this.#createCdpTarget(targetCdpClient, targetInfo);
                 this.#handleWorkerTarget(cdpToBidiTargetTypes[targetInfo.type], cdpTarget, realm);
@@ -19582,14 +19742,11 @@ class CdpTargetManager {
         }
         // DevTools or some other not supported by BiDi target. Just release
         // debugger and ignore them.
-        targetCdpClient
-            .sendCommand('Runtime.runIfWaitingForDebugger')
-            .then(() => parentSessionCdpClient.sendCommand('Target.detachFromTarget', params))
-            .catch((error) => this.#logger?.(log_js_1.LogType.debugError, error));
+        void detach();
     }
     #createCdpTarget(targetCdpClient, targetInfo) {
         this.#setEventListeners(targetCdpClient);
-        const target = CdpTarget_js_1.CdpTarget.create(targetInfo.targetId, targetCdpClient, this.#browserCdpClient, this.#realmStorage, this.#eventManager, this.#preloadScriptStorage, this.#browsingContextStorage, this.#networkStorage, this.#acceptInsecureCerts, this.#logger);
+        const target = CdpTarget_js_1.CdpTarget.create(targetInfo.targetId, targetCdpClient, this.#browserCdpClient, this.#realmStorage, this.#eventManager, this.#preloadScriptStorage, this.#browsingContextStorage, this.#networkStorage, this.#unhandledPromptBehavior, this.#logger);
         this.#networkStorage.onCdpTargetCreated(target);
         return target;
     }
@@ -19664,12 +19821,14 @@ exports.CdpTargetManager = CdpTargetManager;
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.serializeOrigin = exports.BrowsingContextImpl = void 0;
+exports.BrowsingContextImpl = void 0;
+exports.serializeOrigin = serializeOrigin;
 const protocol_js_1 = __nccwpck_require__(40315);
 const assert_js_1 = __nccwpck_require__(1395);
 const Deferred_js_1 = __nccwpck_require__(1104);
 const log_js_1 = __nccwpck_require__(5598);
 const unitConversions_js_1 = __nccwpck_require__(37542);
+const uuid_1 = __nccwpck_require__(8828);
 const WindowRealm_js_1 = __nccwpck_require__(67437);
 class BrowsingContextImpl {
     static LOGGER_PREFIX = `${log_js_1.LogType.debug}:browsingContext`;
@@ -19680,7 +19839,7 @@ class BrowsingContextImpl {
      * The ID of the parent browsing context.
      * If null, this is a top-level context.
      */
-    #parentId;
+    #parentId = null;
     /** Direct children browsing contexts. */
     #children = new Set();
     #browsingContextStorage;
@@ -19691,16 +19850,27 @@ class BrowsingContextImpl {
     #navigation = {
         withinDocument: new Deferred_js_1.Deferred(),
     };
-    #url = 'about:blank';
+    #url;
     #eventManager;
     #realmStorage;
     #loaderId;
     #cdpTarget;
-    #maybeDefaultRealm;
+    // The deferred will be resolved when the default realm is created.
+    #defaultRealmDeferred = new Deferred_js_1.Deferred();
     #logger;
     // Keeps track of the previously set viewport.
     #previousViewport = { width: 0, height: 0 };
-    constructor(id, parentId, userContext, cdpTarget, eventManager, browsingContextStorage, realmStorage, logger) {
+    // The URL of the navigation that is currently in progress. A workaround of the CDP
+    // lacking URL for the pending navigation events, e.g. `Page.frameStartedLoading`.
+    // Set on `Page.navigate`, `Page.reload` commands and on deprecated CDP event
+    // `Page.frameScheduledNavigation`.
+    #pendingNavigationUrl;
+    #virtualNavigationId = (0, uuid_1.uuidv4)();
+    #originalOpener;
+    // Set when the user prompt is opened. Required to provide the type in closing event.
+    #lastUserPromptType;
+    #unhandledPromptBehavior;
+    constructor(id, parentId, userContext, cdpTarget, eventManager, browsingContextStorage, realmStorage, url, originalOpener, unhandledPromptBehavior, logger) {
         this.#cdpTarget = cdpTarget;
         this.#id = id;
         this.#parentId = parentId;
@@ -19708,20 +19878,36 @@ class BrowsingContextImpl {
         this.#eventManager = eventManager;
         this.#browsingContextStorage = browsingContextStorage;
         this.#realmStorage = realmStorage;
+        this.#unhandledPromptBehavior = unhandledPromptBehavior;
         this.#logger = logger;
+        this.#url = url;
+        this.#originalOpener = originalOpener;
     }
-    static create(id, parentId, userContext, cdpTarget, eventManager, browsingContextStorage, realmStorage, logger) {
-        const context = new BrowsingContextImpl(id, parentId, userContext, cdpTarget, eventManager, browsingContextStorage, realmStorage, logger);
+    static create(id, parentId, userContext, cdpTarget, eventManager, browsingContextStorage, realmStorage, url, originalOpener, unhandledPromptBehavior, logger) {
+        const context = new BrowsingContextImpl(id, parentId, userContext, cdpTarget, eventManager, browsingContextStorage, realmStorage, url, originalOpener, unhandledPromptBehavior, logger);
         context.#initListeners();
         browsingContextStorage.addContext(context);
         if (!context.isTopLevelContext()) {
             context.parent.addChild(context.id);
         }
-        eventManager.registerEvent({
-            type: 'event',
-            method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.ContextCreated,
-            params: context.serializeToBidiValue(),
-        }, context.id);
+        // Hold on the `contextCreated` event until the target is unblocked. This is required,
+        // as the parent of the context can be set later in case of reconnecting to an
+        // existing browser instance + OOPiF.
+        eventManager.registerPromiseEvent(context.targetUnblockedOrThrow().then(() => {
+            return {
+                kind: 'success',
+                value: {
+                    type: 'event',
+                    method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.ContextCreated,
+                    params: context.serializeToBidiValue(),
+                },
+            };
+        }, (error) => {
+            return {
+                kind: 'error',
+                error,
+            };
+        }), context.id, protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.ContextCreated);
         return context;
     }
     static getTimestamp() {
@@ -19736,6 +19922,14 @@ class BrowsingContextImpl {
      */
     get navigableId() {
         return this.#loaderId;
+    }
+    /**
+     * Virtual navigation ID. Required, as CDP `loaderId` cannot be mapped 1:1 to all the
+     * navigations (e.g. same document navigations). Updated after each navigation,
+     * including same-document ones.
+     */
+    get virtualNavigationId() {
+        return this.#virtualNavigationId;
     }
     dispose() {
         this.#deleteAllChildren();
@@ -19762,6 +19956,19 @@ class BrowsingContextImpl {
     /** Returns the parent context ID. */
     get parentId() {
         return this.#parentId;
+    }
+    /** Sets the parent context ID and updates parent's children. */
+    set parentId(parentId) {
+        if (this.#parentId !== null) {
+            this.#logger?.(log_js_1.LogType.debugError, 'Parent context already set');
+            // Cannot do anything except logging, as throwing will stop event processing. So
+            // just return,
+            return;
+        }
+        this.#parentId = parentId;
+        if (!this.isTopLevelContext()) {
+            this.parent.addChild(this.id);
+        }
     }
     /** Returns the parent context. */
     get parent() {
@@ -19802,10 +20009,6 @@ class BrowsingContextImpl {
     #deleteAllChildren() {
         this.directChildren.map((child) => child.dispose());
     }
-    get #defaultRealm() {
-        (0, assert_js_1.assert)(this.#maybeDefaultRealm, `No default realm for browsing context ${this.#id}`);
-        return this.#maybeDefaultRealm;
-    }
     get cdpTarget() {
         return this.#cdpTarget;
     }
@@ -19827,7 +20030,8 @@ class BrowsingContextImpl {
     }
     async getOrCreateSandbox(sandbox) {
         if (sandbox === undefined || sandbox === '') {
-            return this.#defaultRealm;
+            // Default realm is not guaranteed to be created at this point, so return a deferred.
+            return await this.#defaultRealmDeferred;
         }
         let maybeSandboxes = this.#realmStorage.findRealms({
             browsingContextId: this.id,
@@ -19857,6 +20061,7 @@ class BrowsingContextImpl {
             context: this.#id,
             url: this.url,
             userContext: this.userContext,
+            originalOpener: this.#originalOpener ?? null,
             children: maxDepth > 0
                 ? this.directChildren.map((c) => c.serializeToBidiValue(maxDepth - 1, false))
                 : null,
@@ -19872,6 +20077,7 @@ class BrowsingContextImpl {
                 return;
             }
             this.#url = params.frame.url + (params.frame.urlFragment ?? '');
+            this.#pendingNavigationUrl = undefined;
             // At the point the page is initialized, all the nested iframes from the
             // previous page are detached and realms are destroyed.
             // Remove children from context.
@@ -19881,6 +20087,7 @@ class BrowsingContextImpl {
             if (this.id !== params.frameId) {
                 return;
             }
+            this.#pendingNavigationUrl = undefined;
             const timestamp = BrowsingContextImpl.getTimestamp();
             this.#url = params.url;
             this.#navigation.withinDocument.resolve();
@@ -19889,7 +20096,7 @@ class BrowsingContextImpl {
                 method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.FragmentNavigated,
                 params: {
                     context: this.id,
-                    navigation: null,
+                    navigation: this.#virtualNavigationId,
                     timestamp,
                     url: this.#url,
                 },
@@ -19899,16 +20106,29 @@ class BrowsingContextImpl {
             if (this.id !== params.frameId) {
                 return;
             }
+            // Generate a new virtual navigation id.
+            this.#virtualNavigationId = (0, uuid_1.uuidv4)();
             this.#eventManager.registerEvent({
                 type: 'event',
                 method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.NavigationStarted,
                 params: {
                     context: this.id,
-                    navigation: null,
+                    navigation: this.#virtualNavigationId,
                     timestamp: BrowsingContextImpl.getTimestamp(),
-                    url: '',
+                    // The URL of the navigation that is currently in progress. Although the URL
+                    // is not yet known in case of user-initiated navigations, it is possible to
+                    // provide the URL in case of BiDi-initiated navigations.
+                    // TODO: provide proper URL in case of user-initiated navigations.
+                    url: this.#pendingNavigationUrl ?? 'UNKNOWN',
                 },
             }, this.id);
+        });
+        // TODO: don't use deprecated `Page.frameScheduledNavigation` event.
+        this.#cdpTarget.cdpClient.on('Page.frameScheduledNavigation', (params) => {
+            if (this.id !== params.frameId) {
+                return;
+            }
+            this.#pendingNavigationUrl = params.url;
         });
         this.#cdpTarget.cdpClient.on('Page.lifecycleEvent', (params) => {
             if (this.id !== params.frameId) {
@@ -19940,7 +20160,7 @@ class BrowsingContextImpl {
                         method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.DomContentLoaded,
                         params: {
                             context: this.id,
-                            navigation: this.#loaderId ?? null,
+                            navigation: this.#virtualNavigationId,
                             timestamp,
                             url: this.#url,
                         },
@@ -19953,7 +20173,7 @@ class BrowsingContextImpl {
                         method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.Load,
                         params: {
                             context: this.id,
-                            navigation: this.#loaderId ?? null,
+                            navigation: this.#virtualNavigationId,
                             timestamp,
                             url: this.#url,
                         },
@@ -19975,7 +20195,13 @@ class BrowsingContextImpl {
                     sandbox = name;
                     // Sandbox should have the same origin as the context itself, but in CDP
                     // it has an empty one.
-                    origin = this.#defaultRealm.origin;
+                    if (!this.#defaultRealmDeferred.isFinished) {
+                        this.#logger?.(log_js_1.LogType.debugError, 'Unexpectedly, isolated realm created before the default one');
+                    }
+                    origin = this.#defaultRealmDeferred.isFinished
+                        ? this.#defaultRealmDeferred.result.origin
+                        : // This fallback is not expected to be ever reached.
+                            '';
                     break;
                 case 'default':
                     origin = serializeOrigin(params.context.origin);
@@ -19985,7 +20211,7 @@ class BrowsingContextImpl {
             }
             const realm = new WindowRealm_js_1.WindowRealm(this.id, this.#browsingContextStorage, this.#cdpTarget.cdpClient, this.#eventManager, id, this.#logger, origin, uniqueId, this.#realmStorage, sandbox);
             if (auxData.isDefault) {
-                this.#maybeDefaultRealm = realm;
+                this.#defaultRealmDeferred.resolve(realm);
                 // Initialize ChannelProxy listeners for all the channels of all the
                 // preload scripts related to this BrowsingContext.
                 // TODO: extend for not default realms by the sandbox name.
@@ -19995,41 +20221,111 @@ class BrowsingContextImpl {
             }
         });
         this.#cdpTarget.cdpClient.on('Runtime.executionContextDestroyed', (params) => {
+            if (this.#defaultRealmDeferred.isFinished &&
+                this.#defaultRealmDeferred.result.executionContextId ===
+                    params.executionContextId) {
+                this.#defaultRealmDeferred = new Deferred_js_1.Deferred();
+            }
             this.#realmStorage.deleteRealms({
                 cdpSessionId: this.#cdpTarget.cdpSessionId,
                 executionContextId: params.executionContextId,
             });
         });
         this.#cdpTarget.cdpClient.on('Runtime.executionContextsCleared', () => {
+            if (!this.#defaultRealmDeferred.isFinished) {
+                this.#defaultRealmDeferred.reject(new protocol_js_1.UnknownErrorException('execution contexts cleared'));
+            }
+            this.#defaultRealmDeferred = new Deferred_js_1.Deferred();
             this.#realmStorage.deleteRealms({
                 cdpSessionId: this.#cdpTarget.cdpSessionId,
             });
         });
         this.#cdpTarget.cdpClient.on('Page.javascriptDialogClosed', (params) => {
             const accepted = params.result;
+            if (this.#lastUserPromptType === undefined) {
+                this.#logger?.(log_js_1.LogType.debugError, 'Unexpectedly no opening prompt event before closing one');
+            }
             this.#eventManager.registerEvent({
                 type: 'event',
                 method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.UserPromptClosed,
                 params: {
                     context: this.id,
                     accepted,
+                    // `lastUserPromptType` should never be undefined here, so fallback to
+                    // `UNKNOWN`. The fallback is required to prevent tests from hanging while
+                    // waiting for the closing event. The cast is required, as the `UNKNOWN` value
+                    // is not standard.
+                    type: this.#lastUserPromptType ??
+                        'UNKNOWN',
                     userText: accepted && params.userInput ? params.userInput : undefined,
                 },
             }, this.id);
+            this.#lastUserPromptType = undefined;
         });
         this.#cdpTarget.cdpClient.on('Page.javascriptDialogOpening', (params) => {
+            const promptType = BrowsingContextImpl.#getPromptType(params.type);
+            // Set the last prompt type to provide it in closing event.
+            this.#lastUserPromptType = promptType;
+            const promptHandler = this.#getPromptHandler(promptType);
             this.#eventManager.registerEvent({
                 type: 'event',
                 method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.UserPromptOpened,
                 params: {
                     context: this.id,
-                    type: params.type,
+                    handler: promptHandler,
+                    type: promptType,
                     message: params.message,
-                    // Don't set the value if empty string
-                    defaultValue: params.defaultPrompt || undefined,
+                    ...(params.type === 'prompt'
+                        ? { defaultValue: params.defaultPrompt }
+                        : {}),
                 },
             }, this.id);
+            switch (promptHandler) {
+                // Based on `unhandledPromptBehavior`, check if the prompt should be handled
+                // automatically (`accept`, `dismiss`) or wait for the user to do it.
+                case "accept" /* Session.UserPromptHandlerType.Accept */:
+                    void this.handleUserPrompt(true);
+                    break;
+                case "dismiss" /* Session.UserPromptHandlerType.Dismiss */:
+                    void this.handleUserPrompt(false);
+                    break;
+                case "ignore" /* Session.UserPromptHandlerType.Ignore */:
+                    break;
+            }
         });
+    }
+    static #getPromptType(cdpType) {
+        switch (cdpType) {
+            case 'alert':
+                return "alert" /* BrowsingContext.UserPromptType.Alert */;
+            case 'beforeunload':
+                return "beforeunload" /* BrowsingContext.UserPromptType.Beforeunload */;
+            case 'confirm':
+                return "confirm" /* BrowsingContext.UserPromptType.Confirm */;
+            case 'prompt':
+                return "prompt" /* BrowsingContext.UserPromptType.Prompt */;
+        }
+    }
+    #getPromptHandler(promptType) {
+        const defaultPromptHandler = "dismiss" /* Session.UserPromptHandlerType.Dismiss */;
+        switch (promptType) {
+            case "alert" /* BrowsingContext.UserPromptType.Alert */:
+                return (this.#unhandledPromptBehavior?.alert ??
+                    this.#unhandledPromptBehavior?.default ??
+                    defaultPromptHandler);
+            case "beforeunload" /* BrowsingContext.UserPromptType.Beforeunload */:
+                return (this.#unhandledPromptBehavior?.beforeUnload ??
+                    this.#unhandledPromptBehavior?.default ??
+                    "accept" /* Session.UserPromptHandlerType.Accept */);
+            case "confirm" /* BrowsingContext.UserPromptType.Confirm */:
+                return (this.#unhandledPromptBehavior?.confirm ??
+                    this.#unhandledPromptBehavior?.default ??
+                    defaultPromptHandler);
+            case "prompt" /* BrowsingContext.UserPromptType.Prompt */:
+                return (this.#unhandledPromptBehavior?.prompt ??
+                    this.#unhandledPromptBehavior?.default ??
+                    defaultPromptHandler);
+        }
     }
     #documentChanged(loaderId) {
         // Same document navigation.
@@ -20075,18 +20371,25 @@ class BrowsingContextImpl {
             throw new protocol_js_1.InvalidArgumentException(`Invalid URL: ${url}`);
         }
         await this.targetUnblockedOrThrow();
+        // Set the pending navigation URL to provide it in `browsingContext.navigationStarted`
+        // event.
+        // TODO: detect navigation start not from CDP. Check if
+        //  `Page.frameRequestedNavigation` can be used for this purpose.
+        this.#pendingNavigationUrl = url;
         // TODO: handle loading errors.
         const cdpNavigateResult = await this.#cdpTarget.cdpClient.sendCommand('Page.navigate', {
             url,
             frameId: this.id,
         });
         if (cdpNavigateResult.errorText) {
+            // If navigation failed, no pending navigation is left.
+            this.#pendingNavigationUrl = undefined;
             this.#eventManager.registerEvent({
                 type: 'event',
                 method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.NavigationFailed,
                 params: {
                     context: this.id,
-                    navigation: cdpNavigateResult.loaderId ?? null,
+                    navigation: this.#virtualNavigationId,
                     timestamp: BrowsingContextImpl.getTimestamp(),
                     url,
                 },
@@ -20117,7 +20420,7 @@ class BrowsingContextImpl {
                 break;
         }
         return {
-            navigation: cdpNavigateResult.loaderId ?? null,
+            navigation: this.#virtualNavigationId,
             // Url can change due to redirect get the latest one.
             url: wait === "none" /* BrowsingContext.ReadinessState.None */ ? url : this.#url,
         };
@@ -20139,9 +20442,7 @@ class BrowsingContextImpl {
                 break;
         }
         return {
-            navigation: wait === "none" /* BrowsingContext.ReadinessState.None */
-                ? null
-                : this.navigableId ?? null,
+            navigation: this.#virtualNavigationId,
             url: this.url,
         };
     }
@@ -20183,10 +20484,10 @@ class BrowsingContextImpl {
             }
         }
     }
-    async handleUserPrompt(params) {
+    async handleUserPrompt(accept, userText) {
         await this.#cdpTarget.cdpClient.sendCommand('Page.handleJavaScriptDialog', {
-            accept: params.accept ?? true,
-            promptText: params.userText,
+            accept: accept ?? true,
+            promptText: userText,
         });
     }
     async activate() {
@@ -20235,9 +20536,18 @@ class BrowsingContextImpl {
         (0, assert_js_1.assert)(originResult.type === 'success');
         const origin = deserializeDOMRect(originResult.result);
         (0, assert_js_1.assert)(origin);
-        const rect = params.clip
-            ? getIntersectionRect(await this.#parseRect(params.clip), origin)
-            : origin;
+        let rect = origin;
+        if (params.clip) {
+            const clip = params.clip;
+            if (params.origin === 'viewport' && clip.type === 'box') {
+                // For viewport origin, the clip is relative to the viewport, while the CDP
+                // screenshot is relative to the document. So correction for the viewport position
+                // is required.
+                clip.x += origin.x;
+                clip.y += origin.y;
+            }
+            rect = getIntersectionRect(await this.#parseRect(clip), origin);
+        }
         if (rect.width === 0 || rect.height === 0) {
             throw new protocol_js_1.UnableToCaptureScreenException(`Unable to capture screenshot with zero dimensions: width=${rect.width}, height=${rect.height}`);
         }
@@ -20390,7 +20700,7 @@ class BrowsingContextImpl {
     }
     async locateNodes(params) {
         // TODO: create a dedicated sandbox instead of `#defaultRealm`.
-        return await this.#locateNodesByLocator(this.#defaultRealm, params.locator, params.startNodes ?? [], params.maxNodeCount, params.serializationOptions);
+        return await this.#locateNodesByLocator(await this.#defaultRealmDeferred, params.locator, params.startNodes ?? [], params.maxNodeCount, params.serializationOptions);
     }
     async #getLocatorDelegate(realm, locator, maxNodeCount, startNodes) {
         switch (locator.type) {
@@ -20398,8 +20708,10 @@ class BrowsingContextImpl {
                 return {
                     functionDeclaration: String((cssSelector, maxNodeCount, ...startNodes) => {
                         const locateNodesUsingCss = (element) => {
-                            if (!(element instanceof HTMLElement)) {
-                                throw new Error('startNodes in css selector should be HTMLElement');
+                            if (!(element instanceof HTMLElement ||
+                                element instanceof Document ||
+                                element instanceof DocumentFragment)) {
+                                throw new Error('startNodes in css selector should be HTMLElement, Document or DocumentFragment');
                             }
                             return [...element.querySelectorAll(cssSelector)];
                         };
@@ -20465,8 +20777,21 @@ class BrowsingContextImpl {
                         const searchText = ignoreCase
                             ? innerTextSelector.toUpperCase()
                             : innerTextSelector;
-                        const locateNodesUsingInnerText = (element, currentMaxDepth) => {
+                        const locateNodesUsingInnerText = (node, currentMaxDepth) => {
                             const returnedNodes = [];
+                            if (node instanceof DocumentFragment ||
+                                node instanceof Document) {
+                                const children = [...node.children];
+                                children.forEach((child) => 
+                                // `currentMaxDepth` is not decremented intentionally according to
+                                // https://github.com/w3c/webdriver-bidi/pull/713.
+                                returnedNodes.push(...locateNodesUsingInnerText(child, currentMaxDepth)));
+                                return returnedNodes;
+                            }
+                            if (!(node instanceof HTMLElement)) {
+                                return [];
+                            }
+                            const element = node;
                             const nodeInnerText = ignoreCase
                                 ? element.innerText?.toUpperCase()
                                 : element.innerText;
@@ -20493,7 +20818,7 @@ class BrowsingContextImpl {
                             else {
                                 const childNodeMatches = 
                                 // Don't search deeper if `maxDepth` is reached.
-                                currentMaxDepth === 0
+                                currentMaxDepth <= 0
                                     ? []
                                     : childNodes
                                         .map((child) => locateNodesUsingInnerText(child, currentMaxDepth - 1))
@@ -20511,9 +20836,8 @@ class BrowsingContextImpl {
                             // TODO: stop search early if `maxNodeCount` is reached.
                             return returnedNodes;
                         };
-                        // TODO: add maxDepth.
                         // TODO: stop search early if `maxNodeCount` is reached.
-                        startNodes = startNodes.length > 0 ? startNodes : [document.body];
+                        startNodes = startNodes.length > 0 ? startNodes : [document];
                         const returnedNodes = startNodes
                             .map((startNode) => 
                         // TODO: stop search early if `maxNodeCount` is reached.
@@ -20545,7 +20869,7 @@ class BrowsingContextImpl {
                 }
                 // The next two commands cause a11y caches for the target to be
                 // preserved. We probably do not need to disable them if the
-                // client is using a11y features but we could by calling
+                // client is using a11y features, but we could by calling
                 // Accessibility.disable.
                 await Promise.all([
                     this.#cdpTarget.cdpClient.sendCommand('Accessibility.enable'),
@@ -20645,8 +20969,8 @@ class BrowsingContextImpl {
             }
             // Heuristic to detect if the `startNode` is not an `HTMLElement` in css selector.
             if (locatorResult.exceptionDetails.text ===
-                'Error: startNodes in css selector should be HTMLElement') {
-                throw new protocol_js_1.InvalidArgumentException(`startNodes in css selector should be HTMLElement`);
+                'Error: startNodes in css selector should be HTMLElement, Document or DocumentFragment') {
+                throw new protocol_js_1.InvalidArgumentException('startNodes in css selector should be HTMLElement, Document or DocumentFragment');
             }
             throw new protocol_js_1.UnknownErrorException(`Unexpected error in selector script: ${locatorResult.exceptionDetails.text}`);
         }
@@ -20671,7 +20995,6 @@ function serializeOrigin(origin) {
     }
     return origin;
 }
-exports.serializeOrigin = serializeOrigin;
 function getImageFormatParameters(params) {
     const { quality, type } = params.format ?? {
         type: 'image/png',
@@ -20782,9 +21105,12 @@ const protocol_js_1 = __nccwpck_require__(40315);
 class BrowsingContextProcessor {
     #browserCdpClient;
     #browsingContextStorage;
-    constructor(browserCdpClient, browsingContextStorage) {
+    #eventManager;
+    constructor(browserCdpClient, browsingContextStorage, eventManager) {
         this.#browserCdpClient = browserCdpClient;
         this.#browsingContextStorage = browsingContextStorage;
+        this.#eventManager = eventManager;
+        this.#eventManager.addSubscribeHook(protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.ContextCreated, this.#onContextCreatedSubscribeHook.bind(this));
     }
     getTree(params) {
         const resultContexts = params.root === undefined
@@ -20830,6 +21156,7 @@ class BrowsingContextProcessor {
                 url: 'about:blank',
                 newWindow,
                 browserContextId: userContext === 'default' ? undefined : userContext,
+                background: params.background === true,
             });
         }
         catch (err) {
@@ -20895,7 +21222,7 @@ class BrowsingContextProcessor {
     async handleUserPrompt(params) {
         const context = this.#browsingContextStorage.getContext(params.context);
         try {
-            await context.handleUserPrompt(params);
+            await context.handleUserPrompt(params.accept, params.userText);
         }
         catch (error) {
             // Heuristically determine the error
@@ -20948,6 +21275,21 @@ class BrowsingContextProcessor {
     async locateNodes(params) {
         const context = this.#browsingContextStorage.getContext(params.context);
         return await context.locateNodes(params);
+    }
+    #onContextCreatedSubscribeHook(contextId) {
+        const context = this.#browsingContextStorage.getContext(contextId);
+        const contextsToReport = [
+            context,
+            ...this.#browsingContextStorage.getContext(contextId).allChildren,
+        ];
+        contextsToReport.forEach((context) => {
+            this.#eventManager.registerEvent({
+                type: 'event',
+                method: protocol_js_1.ChromiumBidi.BrowsingContext.EventNames.ContextCreated,
+                params: context.serializeToBidiValue(),
+            }, context.id);
+        });
+        return Promise.resolve();
     }
 }
 exports.BrowsingContextProcessor = BrowsingContextProcessor;
@@ -21086,6 +21428,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ActionDispatcher = void 0;
 const protocol_js_1 = __nccwpck_require__(40315);
 const assert_js_1 = __nccwpck_require__(1395);
+const GraphemeTools_1 = __nccwpck_require__(63728);
 const InputSource_js_1 = __nccwpck_require__(49944);
 const keyUtils_js_1 = __nccwpck_require__(8444);
 const USKeyboardLayout_js_1 = __nccwpck_require__(83212);
@@ -21206,7 +21549,7 @@ class ActionDispatcher {
             }
         }
     }
-    #dispatchPointerDownAction(source, keyState, action) {
+    async #dispatchPointerDownAction(source, keyState, action) {
         const { button } = action;
         if (source.pressed.has(button)) {
             return;
@@ -21217,11 +21560,12 @@ class ActionDispatcher {
         const { tiltX, tiltY } = getTilt(action);
         // --- Platform-specific code begins here ---
         const { modifiers } = keyState;
+        const { radiusX, radiusY } = getRadii(width ?? 1, height ?? 1);
         switch (pointerType) {
             case "mouse" /* Input.PointerType.Mouse */:
             case "pen" /* Input.PointerType.Pen */:
                 // TODO: Implement width and height when available.
-                return this.#context.cdpTarget.cdpClient.sendCommand('Input.dispatchMouseEvent', {
+                await this.#context.cdpTarget.cdpClient.sendCommand('Input.dispatchMouseEvent', {
                     type: 'mousePressed',
                     x,
                     y,
@@ -21236,14 +21580,16 @@ class ActionDispatcher {
                     twist,
                     force: pressure,
                 });
+                break;
             case "touch" /* Input.PointerType.Touch */:
-                return this.#context.cdpTarget.cdpClient.sendCommand('Input.dispatchTouchEvent', {
+                await this.#context.cdpTarget.cdpClient.sendCommand('Input.dispatchTouchEvent', {
                     type: 'touchStart',
                     touchPoints: [
                         {
                             x,
                             y,
-                            ...getRadii(width ?? 1, height ?? 1),
+                            radiusX,
+                            radiusY,
                             tangentialPressure,
                             tiltX,
                             tiltY,
@@ -21254,7 +21600,11 @@ class ActionDispatcher {
                     ],
                     modifiers,
                 });
+                break;
         }
+        source.radiusX = radiusX;
+        source.radiusY = radiusY;
+        source.force = pressure;
         // --- Platform-specific code ends here ---
     }
     #dispatchPointerUpAction(source, keyState, action) {
@@ -21263,7 +21613,7 @@ class ActionDispatcher {
             return;
         }
         source.pressed.delete(button);
-        const { x, y, subtype: pointerType } = source;
+        const { x, y, force, radiusX, radiusY, subtype: pointerType } = source;
         // --- Platform-specific code begins here ---
         const { modifiers } = keyState;
         switch (pointerType) {
@@ -21288,6 +21638,9 @@ class ActionDispatcher {
                             x,
                             y,
                             id: source.pointerId,
+                            force,
+                            radiusX,
+                            radiusY,
                         },
                     ],
                     modifiers,
@@ -21299,6 +21652,7 @@ class ActionDispatcher {
         const { x: startX, y: startY, subtype: pointerType } = source;
         const { width, height, pressure, twist, tangentialPressure, x: offsetX, y: offsetY, origin = 'viewport', duration = this.#tickDuration, } = action;
         const { tiltX, tiltY } = getTilt(action);
+        const { radiusX, radiusY } = getRadii(width ?? 1, height ?? 1);
         const { targetX, targetY } = await this.#getCoordinateFromOrigin(origin, offsetX, offsetY, startX, startY);
         if (targetX < 0 || targetY < 0) {
             throw new protocol_js_1.MoveTargetOutOfBoundsException(`Cannot move beyond viewport (x: ${targetX}, y: ${targetY})`);
@@ -21367,7 +21721,8 @@ class ActionDispatcher {
                                     {
                                         x,
                                         y,
-                                        ...getRadii(width ?? 1, height ?? 1),
+                                        radiusX,
+                                        radiusY,
                                         tangentialPressure,
                                         tiltX,
                                         tiltY,
@@ -21384,6 +21739,9 @@ class ActionDispatcher {
                 // --- Platform-specific code ends here ---
                 source.x = x;
                 source.y = y;
+                source.radiusX = radiusX;
+                source.radiusY = radiusY;
+                source.force = pressure;
             }
         } while (!last);
     }
@@ -21452,10 +21810,13 @@ class ActionDispatcher {
         } while (!last);
     }
     async #dispatchKeyDownAction(source, action) {
-        if ([...action.value].length > 1) {
-            throw new protocol_js_1.InvalidArgumentException(`Invalid key value: ${action.value}`);
-        }
         const rawKey = action.value;
+        if (!(0, GraphemeTools_1.isSingleGrapheme)(rawKey)) {
+            // https://w3c.github.io/webdriver/#dfn-process-a-key-action
+            // WebDriver spec allows a grapheme to be used.
+            throw new protocol_js_1.InvalidArgumentException(`Invalid key value: ${rawKey}`);
+        }
+        const isGrapheme = (0, GraphemeTools_1.isSingleComplexGrapheme)(rawKey);
         const key = (0, keyUtils_js_1.getNormalizedKey)(rawKey);
         const repeat = source.pressed.has(key);
         const code = (0, keyUtils_js_1.getKeyCode)(rawKey);
@@ -21479,7 +21840,7 @@ class ActionDispatcher {
         // --- Platform-specific code begins here ---
         // The spread is a little hack so JS gives us an array of unicode characters
         // to measure.
-        const unmodifiedText = getKeyEventUnmodifiedText(key, source);
+        const unmodifiedText = getKeyEventUnmodifiedText(key, source, isGrapheme);
         const text = getKeyEventText(code ?? '', source) ?? unmodifiedText;
         let command;
         // The following commands need to be declared because Chromium doesn't
@@ -21533,10 +21894,13 @@ class ActionDispatcher {
         // --- Platform-specific code ends here ---
     }
     #dispatchKeyUpAction(source, action) {
-        if ([...action.value].length > 1) {
-            throw new protocol_js_1.InvalidArgumentException(`Invalid key value: ${action.value}`);
-        }
         const rawKey = action.value;
+        if (!(0, GraphemeTools_1.isSingleGrapheme)(rawKey)) {
+            // https://w3c.github.io/webdriver/#dfn-process-a-key-action
+            // WebDriver spec allows a grapheme to be used.
+            throw new protocol_js_1.InvalidArgumentException(`Invalid key value: ${rawKey}`);
+        }
+        const isGrapheme = (0, GraphemeTools_1.isSingleComplexGrapheme)(rawKey);
         const key = (0, keyUtils_js_1.getNormalizedKey)(rawKey);
         if (!source.pressed.has(key)) {
             return;
@@ -21562,7 +21926,7 @@ class ActionDispatcher {
         // --- Platform-specific code begins here ---
         // The spread is a little hack so JS gives us an array of unicode characters
         // to measure.
-        const unmodifiedText = getKeyEventUnmodifiedText(key, source);
+        const unmodifiedText = getKeyEventUnmodifiedText(key, source, isGrapheme);
         const text = getKeyEventText(code ?? '', source) ?? unmodifiedText;
         return this.#context.cdpTarget.cdpClient.sendCommand('Input.dispatchKeyEvent', {
             type: 'keyUp',
@@ -21580,10 +21944,20 @@ class ActionDispatcher {
     }
 }
 exports.ActionDispatcher = ActionDispatcher;
-const getKeyEventUnmodifiedText = (key, source) => {
+/**
+ * Translates a non-grapheme key to either an `undefined` for a special keys, or a single
+ * character modified by shift if needed.
+ */
+const getKeyEventUnmodifiedText = (key, source, isGrapheme) => {
+    if (isGrapheme) {
+        // Graphemes should be presented as text in the CDP command.
+        return key;
+    }
     if (key === 'Enter') {
         return '\r';
     }
+    // If key is not a single character, it is a normalized key value, and should be
+    // presented as key, not text in the CDP command.
     return [...key].length === 1
         ? source.shift
             ? key.toLocaleUpperCase('en-US')
@@ -21808,36 +22182,42 @@ class InputProcessor {
         try {
             result = await realm.callFunction(String(function getFiles(fileListLength) {
                 if (!(this instanceof HTMLInputElement)) {
-                    return 0 /* ErrorCode.Object */;
+                    if (this instanceof Element) {
+                        return 1 /* ErrorCode.Element */;
+                    }
+                    return 0 /* ErrorCode.Node */;
                 }
                 if (this.type !== 'file') {
-                    return 1 /* ErrorCode.Type */;
+                    return 2 /* ErrorCode.Type */;
                 }
                 if (this.disabled) {
-                    return 2 /* ErrorCode.Disabled */;
+                    return 3 /* ErrorCode.Disabled */;
                 }
                 if (fileListLength > 1 && !this.multiple) {
-                    return 3 /* ErrorCode.Multiple */;
+                    return 4 /* ErrorCode.Multiple */;
                 }
                 return;
             }), false, params.element, [{ type: 'number', value: params.files.length }]);
         }
         catch {
-            throw new protocol_js_1.NoSuchElementException(`Could not find element ${params.element.sharedId}`);
+            throw new protocol_js_1.NoSuchNodeException(`Could not find element ${params.element.sharedId}`);
         }
         (0, assert_js_1.assert)(result.type === 'success');
         if (result.result.type === 'number') {
             switch (result.result.value) {
-                case 0 /* ErrorCode.Object */: {
+                case 0 /* ErrorCode.Node */: {
                     throw new protocol_js_1.NoSuchElementException(`Could not find element ${params.element.sharedId}`);
                 }
-                case 1 /* ErrorCode.Type */: {
-                    throw new protocol_js_1.UnableToSetFileInputException(`Element ${params.element.sharedId} is not a file input`);
+                case 1 /* ErrorCode.Element */: {
+                    throw new protocol_js_1.UnableToSetFileInputException(`Element ${params.element.sharedId} is not a input`);
                 }
-                case 2 /* ErrorCode.Disabled */: {
+                case 2 /* ErrorCode.Type */: {
+                    throw new protocol_js_1.UnableToSetFileInputException(`Input element ${params.element.sharedId} is not a file type`);
+                }
+                case 3 /* ErrorCode.Disabled */: {
                     throw new protocol_js_1.UnableToSetFileInputException(`Input element ${params.element.sharedId} is disabled`);
                 }
-                case 3 /* ErrorCode.Multiple */: {
+                case 4 /* ErrorCode.Multiple */: {
                     throw new protocol_js_1.UnableToSetFileInputException(`Cannot set multiple files on a non-multiple input element`);
                 }
             }
@@ -22021,6 +22401,9 @@ class PointerSource {
     pressed = new Set();
     x = 0;
     y = 0;
+    radiusX;
+    radiusY;
+    force;
     constructor(id, subtype) {
         this.pointerId = id;
         this.subtype = subtype;
@@ -22543,7 +22926,13 @@ exports.KeyToKeyCode = {
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getKeyLocation = exports.getKeyCode = exports.getNormalizedKey = void 0;
+exports.getNormalizedKey = getNormalizedKey;
+exports.getKeyCode = getKeyCode;
+exports.getKeyLocation = getKeyLocation;
+/**
+ * Returns the normalized key value for a given key according to the table:
+ * https://w3c.github.io/webdriver/#dfn-normalized-key-value
+ */
 function getNormalizedKey(value) {
     switch (value) {
         case '\uE000':
@@ -22558,8 +22947,9 @@ function getNormalizedKey(value) {
             return 'Tab';
         case '\uE005':
             return 'Clear';
+        // Specification declares the '\uE006' to be `Return`, but it is not supported by
+        // Chrome, so fall back to `Enter`, which aligns with WPT.
         case '\uE006':
-            return 'Return';
         case '\uE007':
             return 'Enter';
         case '\uE008':
@@ -22690,7 +23080,10 @@ function getNormalizedKey(value) {
             return value;
     }
 }
-exports.getNormalizedKey = getNormalizedKey;
+/**
+ * Returns the key code for a given key according to the table:
+ * https://w3c.github.io/webdriver/#dfn-shifted-character
+ */
 function getKeyCode(key) {
     switch (key) {
         case '`':
@@ -22743,6 +23136,10 @@ function getKeyCode(key) {
         case '=':
         case '+':
             return 'Equal';
+        // The spec declares the '<' to be `IntlBackslash` as well, but it is already covered
+        // in the `Comma` above.
+        case '>':
+            return 'IntlBackslash';
         case 'a':
         case 'A':
             return 'KeyA';
@@ -22845,6 +23242,8 @@ function getKeyCode(key) {
             return 'ControlRight';
         case '\uE006':
             return 'Enter';
+        case '\uE00B':
+            return 'Pause';
         case '\uE03D':
             return 'MetaLeft';
         case '\uE053':
@@ -22906,6 +23305,8 @@ function getKeyCode(key) {
             return 'F11';
         case '\uE03C':
             return 'F12';
+        case '\uE019':
+            return 'NumpadEqual';
         case '\uE01A':
         case '\uE05C':
             return 'Numpad0';
@@ -22954,7 +23355,10 @@ function getKeyCode(key) {
             return;
     }
 }
-exports.getKeyCode = getKeyCode;
+/**
+ * Returns the location of the key according to the table:
+ * https://w3c.github.io/webdriver/#dfn-key-location
+ */
 function getKeyLocation(key) {
     switch (key) {
         case '\uE007':
@@ -22963,6 +23367,7 @@ function getKeyLocation(key) {
         case '\uE00A':
         case '\uE03D':
             return 1;
+        case '\uE019':
         case '\uE01A':
         case '\uE01B':
         case '\uE01C':
@@ -22999,7 +23404,6 @@ function getKeyLocation(key) {
             return 0;
     }
 }
-exports.getKeyLocation = getKeyLocation;
 //# sourceMappingURL=keyUtils.js.map
 
 /***/ }),
@@ -23091,6 +23495,9 @@ class LogManager {
                             args,
                         },
                     },
+                }), (error) => ({
+                    kind: 'error',
+                    error,
                 })), browsingContext.id, protocol_js_1.ChromiumBidi.Log.EventNames.LogEntryAdded);
             }
         });
@@ -23121,6 +23528,9 @@ class LogManager {
                             type: 'javascript',
                         },
                     },
+                }), (error) => ({
+                    kind: 'error',
+                    error,
                 })), browsingContext.id, protocol_js_1.ChromiumBidi.Log.EventNames.LogEntryAdded);
             }
         });
@@ -23165,7 +23575,8 @@ exports.LogManager = LogManager;
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.getRemoteValuesText = exports.logMessageFormatter = void 0;
+exports.logMessageFormatter = logMessageFormatter;
+exports.getRemoteValuesText = getRemoteValuesText;
 const assert_js_1 = __nccwpck_require__(1395);
 const specifiers = ['%s', '%d', '%i', '%f', '%o', '%O', '%c'];
 function isFormatSpecifier(str) {
@@ -23226,7 +23637,6 @@ function logMessageFormatter(args) {
     }
     return output;
 }
-exports.logMessageFormatter = logMessageFormatter;
 /**
  * @param arg input remote value to be parsed
  * @return parsed text of the remote value
@@ -23319,7 +23729,6 @@ function getRemoteValuesText(args, formatText) {
     })
         .join('\u0020');
 }
-exports.getRemoteValuesText = getRemoteValuesText;
 //# sourceMappingURL=logHelper.js.map
 
 /***/ }),
@@ -23329,10 +23738,25 @@ exports.getRemoteValuesText = getRemoteValuesText;
 
 "use strict";
 
+/**
+ * Copyright 2023 Google LLC.
+ * Copyright (c) Microsoft Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.NetworkProcessor = void 0;
 const protocol_js_1 = __nccwpck_require__(40315);
-const NetworkUtils_js_1 = __nccwpck_require__(920);
 /** Dispatches Network domain commands. */
 class NetworkProcessor {
     #browsingContextStorage;
@@ -23358,59 +23782,41 @@ class NetworkProcessor {
         };
     }
     async continueRequest(params) {
-        const { url, method, headers: commandHeaders, body, request: networkId, } = params;
         if (params.url !== undefined) {
             NetworkProcessor.parseUrlString(params.url);
         }
-        const request = this.#getBlockedRequestOrFail(networkId, [
+        if (params.method !== undefined) {
+            if (!NetworkProcessor.isMethodValid(params.method)) {
+                throw new protocol_js_1.InvalidArgumentException(`Method '${params.method}' is invalid.`);
+            }
+        }
+        if (params.headers) {
+            NetworkProcessor.validateHeaders(params.headers);
+        }
+        const request = this.#getBlockedRequestOrFail(params.request, [
             "beforeRequestSent" /* Network.InterceptPhase.BeforeRequestSent */,
         ]);
-        const headers = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(commandHeaders);
-        // TODO: Set / expand.
-        // ; Step 9. cookies
-        await request.continueRequest({
-            url,
-            method,
-            headers,
-            postData: getCdpBodyFromBiDiBytesValue(body),
-        });
+        try {
+            await request.continueRequest(params);
+        }
+        catch (error) {
+            throw NetworkProcessor.wrapInterceptionError(error);
+        }
         return {};
     }
     async continueResponse(params) {
-        const { request: networkId, statusCode, reasonPhrase, headers } = params;
-        const responseHeaders = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(headers);
-        const request = this.#getBlockedRequestOrFail(networkId, [
+        if (params.headers) {
+            NetworkProcessor.validateHeaders(params.headers);
+        }
+        const request = this.#getBlockedRequestOrFail(params.request, [
             "authRequired" /* Network.InterceptPhase.AuthRequired */,
             "responseStarted" /* Network.InterceptPhase.ResponseStarted */,
         ]);
-        if (request.interceptPhase === "authRequired" /* Network.InterceptPhase.AuthRequired */) {
-            if (params.credentials) {
-                await Promise.all([
-                    request.waitNextPhase,
-                    request.continueWithAuth({
-                        response: 'ProvideCredentials',
-                        username: params.credentials.username,
-                        password: params.credentials.password,
-                    }),
-                ]);
-            }
-            else {
-                // We need to use `ProvideCredentials`
-                // As `Default` may cancel the request
-                await request.continueWithAuth({
-                    response: 'ProvideCredentials',
-                });
-                return {};
-            }
+        try {
+            await request.continueResponse(params);
         }
-        if (request.interceptPhase === "responseStarted" /* Network.InterceptPhase.ResponseStarted */) {
-            // TODO: Set / expand.
-            // ; Step 10. cookies
-            await request.continueResponse({
-                responseCode: statusCode,
-                responsePhrase: reasonPhrase,
-                responseHeaders,
-            });
+        catch (error) {
+            throw NetworkProcessor.wrapInterceptionError(error);
         }
         return {};
     }
@@ -23419,19 +23825,7 @@ class NetworkProcessor {
         const request = this.#getBlockedRequestOrFail(networkId, [
             "authRequired" /* Network.InterceptPhase.AuthRequired */,
         ]);
-        let username;
-        let password;
-        if (params.action === 'provideCredentials') {
-            const { credentials } = params;
-            username = credentials.username;
-            password = credentials.password;
-        }
-        const response = (0, NetworkUtils_js_1.cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction)(params.action);
-        await request.continueWithAuth({
-            response,
-            username,
-            password,
-        });
+        await request.continueWithAuth(params);
         return {};
     }
     async failRequest({ request: networkId, }) {
@@ -23446,41 +23840,20 @@ class NetworkProcessor {
         return {};
     }
     async provideResponse(params) {
-        const { statusCode, reasonPhrase: responsePhrase, headers, body, request: networkId, } = params;
-        // TODO: Step 6
-        // https://w3c.github.io/webdriver-bidi/#command-network-continueResponse
-        const responseHeaders = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(headers);
-        // TODO: Set / expand.
-        // ; Step 10. cookies
-        // ; Step 11. credentials
-        const request = this.#getBlockedRequestOrFail(networkId, [
+        if (params.headers) {
+            NetworkProcessor.validateHeaders(params.headers);
+        }
+        const request = this.#getBlockedRequestOrFail(params.request, [
             "beforeRequestSent" /* Network.InterceptPhase.BeforeRequestSent */,
             "responseStarted" /* Network.InterceptPhase.ResponseStarted */,
             "authRequired" /* Network.InterceptPhase.AuthRequired */,
         ]);
-        // We need to pass through if the request is already in
-        // AuthRequired phase
-        if (request.interceptPhase === "authRequired" /* Network.InterceptPhase.AuthRequired */) {
-            // We need to use `ProvideCredentials`
-            // As `Default` may cancel the request
-            await request.continueWithAuth({
-                response: 'ProvideCredentials',
-            });
-            return {};
+        try {
+            await request.provideResponse(params);
         }
-        // If we con't modify the response
-        // Just continue the request
-        if (!body && !headers) {
-            await request.continueRequest();
-            return {};
+        catch (error) {
+            throw NetworkProcessor.wrapInterceptionError(error);
         }
-        const responseCode = statusCode ?? request.statusCode ?? 200;
-        await request.provideResponse({
-            responseCode,
-            responsePhrase,
-            responseHeaders,
-            body: getCdpBodyFromBiDiBytesValue(body),
-        });
         return {};
     }
     async removeIntercept(params) {
@@ -23506,6 +23879,29 @@ class NetworkProcessor {
             throw new protocol_js_1.InvalidArgumentException(`Blocked request for network id '${id}' is in '${request.interceptPhase}' phase`);
         }
         return request;
+    }
+    /**
+     * Validate https://fetch.spec.whatwg.org/#header-value
+     */
+    static validateHeaders(headers) {
+        for (const header of headers) {
+            let headerValue;
+            if (header.value.type === 'string') {
+                headerValue = header.value.value;
+            }
+            else {
+                headerValue = atob(header.value.value);
+            }
+            if (headerValue !== headerValue.trim() ||
+                headerValue.includes('\n') ||
+                headerValue.includes('\0')) {
+                throw new protocol_js_1.InvalidArgumentException(`Header value '${headerValue}' is not acceptable value`);
+            }
+        }
+    }
+    static isMethodValid(method) {
+        // https://httpwg.org/specs/rfc9110.html#method.overview
+        return /^[!#$%&'*+\-.^_`|~a-zA-Z\d]+$/.test(method);
     }
     /**
      * Attempts to parse the given url.
@@ -23596,6 +23992,13 @@ class NetworkProcessor {
             }
         });
     }
+    static wrapInterceptionError(error) {
+        // https://source.chromium.org/chromium/chromium/src/+/main:content/browser/devtools/protocol/fetch_handler.cc;l=169
+        if (error?.message.includes('Invalid header')) {
+            return new protocol_js_1.InvalidArgumentException('Invalid header');
+        }
+        return error;
+    }
 }
 exports.NetworkProcessor = NetworkProcessor;
 /**
@@ -23619,16 +24022,6 @@ function unescapeURLPattern(pattern) {
         isEscaped = false;
     }
     return result;
-}
-function getCdpBodyFromBiDiBytesValue(body) {
-    let parsedBody;
-    if (body?.type === 'string') {
-        parsedBody = btoa(body.value);
-    }
-    else if (body?.type === 'base64') {
-        parsedBody = body.value;
-    }
-    return parsedBody;
 }
 //# sourceMappingURL=NetworkProcessor.js.map
 
@@ -23684,6 +24077,7 @@ class NetworkRequest {
     #servedFromCache = false;
     #redirectCount;
     #request = {};
+    #requestOverrides;
     #response = {};
     #eventManager;
     #networkStorage;
@@ -23723,18 +24117,12 @@ class NetworkRequest {
             '';
         const url = this.#response.info?.url ??
             this.#response.paused?.request.url ??
+            this.#requestOverrides?.url ??
             this.#request.auth?.request.url ??
             this.#request.info?.request.url ??
             this.#request.paused?.request.url ??
             NetworkRequest.unknownParameter;
         return `${url}${fragment}`;
-    }
-    get method() {
-        return (this.#request.info?.request.method ??
-            this.#request.paused?.request.method ??
-            this.#request.auth?.request.method ??
-            this.#response.paused?.request.method ??
-            NetworkRequest.unknownParameter);
     }
     get redirectCount() {
         return this.#redirectCount;
@@ -23748,8 +24136,118 @@ class NetworkRequest {
     isRedirecting() {
         return Boolean(this.#request.info);
     }
-    isDataUrl() {
+    #isDataUrl() {
         return this.url.startsWith('data:');
+    }
+    get #method() {
+        return (this.#requestOverrides?.method ??
+            this.#request.info?.request.method ??
+            this.#request.paused?.request.method ??
+            this.#request.auth?.request.method ??
+            this.#response.paused?.request.method);
+    }
+    get #navigationId() {
+        // Heuristic to determine if this is a navigation request, and if not return null.
+        if (!this.#request.info ||
+            !this.#request.info.loaderId ||
+            // When we navigate all CDP network events have `loaderId`
+            // CDP's `loaderId` and `requestId` match when
+            // that request triggered the loading
+            this.#request.info.loaderId !== this.#request.info.requestId) {
+            return null;
+        }
+        // Get virtual navigation ID from the browsing context.
+        return this.#networkStorage.getVirtualNavigationId(this.#context ?? undefined);
+    }
+    get #cookies() {
+        let cookies = [];
+        if (this.#request.extraInfo) {
+            cookies = this.#request.extraInfo.associatedCookies
+                .filter(({ blockedReasons }) => {
+                return !Array.isArray(blockedReasons) || blockedReasons.length === 0;
+            })
+                .map(({ cookie }) => (0, NetworkUtils_js_1.cdpToBiDiCookie)(cookie));
+        }
+        return cookies;
+    }
+    get #bodySize() {
+        let bodySize = 0;
+        if (typeof this.#requestOverrides?.bodySize === 'number') {
+            bodySize = this.#requestOverrides.bodySize;
+        }
+        else {
+            bodySize = (0, NetworkUtils_js_1.bidiBodySizeFromCdpPostDataEntries)(this.#request.info?.request.postDataEntries ?? []);
+        }
+        return bodySize;
+    }
+    get #context() {
+        return (this.#response.paused?.frameId ??
+            this.#request.info?.frameId ??
+            this.#request.paused?.frameId ??
+            this.#request.auth?.frameId ??
+            null);
+    }
+    /** Returns the HTTP status code associated with this request if any. */
+    get #statusCode() {
+        return (this.#response.paused?.responseStatusCode ??
+            this.#response.extraInfo?.statusCode ??
+            this.#response.info?.status);
+    }
+    get #requestHeaders() {
+        let headers = [];
+        if (this.#requestOverrides?.headers) {
+            headers = this.#requestOverrides.headers;
+        }
+        else {
+            headers = [
+                ...(0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#request.info?.request.headers),
+                ...(0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#request.extraInfo?.headers),
+            ];
+        }
+        return headers;
+    }
+    get #authChallenges() {
+        // TODO: get headers from Fetch.requestPaused
+        if (!this.#response.info) {
+            return;
+        }
+        if (!(this.#statusCode === 401 || this.#statusCode === 407)) {
+            return undefined;
+        }
+        const headerName = this.#statusCode === 401 ? 'WWW-Authenticate' : 'Proxy-Authenticate';
+        const authChallenges = [];
+        for (const [header, value] of Object.entries(this.#response.info.headers)) {
+            // TODO: Do a proper match based on https://httpwg.org/specs/rfc9110.html#credentials
+            // Or verify this works
+            if (header.localeCompare(headerName, undefined, { sensitivity: 'base' }) === 0) {
+                authChallenges.push({
+                    scheme: value.split(' ').at(0) ?? '',
+                    realm: value.match(REALM_REGEX)?.at(0) ?? '',
+                });
+            }
+        }
+        return authChallenges;
+    }
+    get #timings() {
+        return {
+            // TODO: Verify this is correct
+            timeOrigin: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.requestTime),
+            requestTime: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.requestTime),
+            redirectStart: 0,
+            redirectEnd: 0,
+            // TODO: Verify this is correct
+            // https://source.chromium.org/chromium/chromium/src/+/main:net/base/load_timing_info.h;l=145
+            fetchStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.requestTime),
+            dnsStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.dnsStart),
+            dnsEnd: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.dnsEnd),
+            connectStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.connectStart),
+            connectEnd: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.connectEnd),
+            tlsStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.sslStart),
+            requestStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.sendStart),
+            // https://source.chromium.org/chromium/chromium/src/+/main:net/base/load_timing_info.h;l=196
+            responseStart: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.receiveHeadersStart),
+            responseEnd: (0, NetworkUtils_js_1.getTiming)(this.#response.info?.timing?.receiveHeadersEnd),
+        };
     }
     #phaseChanged() {
         this.waitNextPhase.resolve();
@@ -23778,7 +24276,7 @@ class NetworkRequest {
         // Flush redirects
         options.wasRedirected ||
             options.hasFailed ||
-            this.isDataUrl() ||
+            this.#isDataUrl() ||
             Boolean(this.#request.extraInfo) ||
             // Requests from cache don't have extra info
             this.#servedFromCache ||
@@ -23787,7 +24285,7 @@ class NetworkRequest {
             Boolean(this.#response.info && !this.#response.hasExtraInfo);
         const noInterceptionExpected = 
         // We can't intercept data urls from CDP
-        this.isDataUrl() ||
+        this.#isDataUrl() ||
             // Cached requests never hit the network
             this.#servedFromCache;
         const requestInterceptionExpected = !noInterceptionExpected &&
@@ -23817,6 +24315,7 @@ class NetworkRequest {
             responseExtraInfoCompleted &&
             responseInterceptionCompleted) {
             this.#emitEvent(this.#getResponseReceivedEvent.bind(this));
+            this.#networkStorage.deleteRequest(this.id);
         }
     }
     onRequestWillBeSentEvent(event) {
@@ -23885,7 +24384,7 @@ class NetworkRequest {
                 this.#interceptPhase = "responseStarted" /* Network.InterceptPhase.ResponseStarted */;
             }
             else {
-                void this.continueResponse();
+                void this.#continueResponse();
             }
         }
         else {
@@ -23898,7 +24397,7 @@ class NetworkRequest {
                 this.#interceptPhase = "beforeRequestSent" /* Network.InterceptPhase.BeforeRequestSent */;
             }
             else {
-                void this.continueRequest();
+                void this.#continueRequest();
             }
         }
         this.#emitEventsIfReady();
@@ -23912,7 +24411,9 @@ class NetworkRequest {
             this.#interceptPhase = "authRequired" /* Network.InterceptPhase.AuthRequired */;
         }
         else {
-            void this.continueWithAuth();
+            void this.#continueWithAuth({
+                response: 'Default',
+            });
         }
         this.#emitEvent(() => {
             return {
@@ -23925,19 +24426,67 @@ class NetworkRequest {
         });
     }
     /** @see https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-continueRequest */
-    async continueRequest({ url, method, headers, postData, } = {}) {
+    async continueRequest(overrides = {}) {
+        const overrideHeaders = this.#getOverrideHeader(overrides.headers, overrides.cookies);
+        const headers = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(overrideHeaders);
+        const postData = getCdpBodyFromBiDiBytesValue(overrides.body);
+        await this.#continueRequest({
+            url: overrides.url,
+            method: overrides.method,
+            headers,
+            postData,
+        });
+        this.#requestOverrides = {
+            url: overrides.url,
+            method: overrides.method,
+            headers: overrides.headers,
+            cookies: overrides.cookies,
+            bodySize: getSizeFromBiDiBytesValue(overrides.body),
+        };
+    }
+    async #continueRequest(overrides = {}) {
         (0, assert_js_1.assert)(this.#fetchId, 'Network Interception not set-up.');
         await this.cdpClient.sendCommand('Fetch.continueRequest', {
             requestId: this.#fetchId,
-            url,
-            method,
-            headers,
-            postData,
+            url: overrides.url,
+            method: overrides.method,
+            headers: overrides.headers,
+            postData: overrides.postData,
         });
         this.#interceptPhase = undefined;
     }
     /** @see https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-continueResponse */
-    async continueResponse({ responseCode, responsePhrase, responseHeaders, } = {}) {
+    async continueResponse(overrides = {}) {
+        if (this.interceptPhase === "authRequired" /* Network.InterceptPhase.AuthRequired */) {
+            if (overrides.credentials) {
+                await Promise.all([
+                    this.waitNextPhase,
+                    await this.#continueWithAuth({
+                        response: 'ProvideCredentials',
+                        username: overrides.credentials.username,
+                        password: overrides.credentials.password,
+                    }),
+                ]);
+            }
+            else {
+                // We need to use `ProvideCredentials`
+                // As `Default` may cancel the request
+                return await this.#continueWithAuth({
+                    response: 'ProvideCredentials',
+                });
+            }
+        }
+        if (this.#interceptPhase === "responseStarted" /* Network.InterceptPhase.ResponseStarted */) {
+            const overrideHeaders = this.#getOverrideHeader(overrides.headers, overrides.cookies);
+            const responseHeaders = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(overrideHeaders);
+            await this.#continueResponse({
+                responseCode: overrides.statusCode,
+                responsePhrase: overrides.reasonPhrase,
+                responseHeaders,
+            });
+        }
+    }
+    async #continueResponse({ responseCode, responsePhrase, responseHeaders, } = {}) {
         (0, assert_js_1.assert)(this.#fetchId, 'Network Interception not set-up.');
         await this.cdpClient.sendCommand('Fetch.continueResponse', {
             requestId: this.#fetchId,
@@ -23948,40 +24497,57 @@ class NetworkRequest {
         this.#interceptPhase = undefined;
     }
     /** @see https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-continueWithAuth */
-    async continueWithAuth(authChallengeResponse = {
-        response: 'Default',
-    }) {
+    async continueWithAuth(authChallenge) {
+        let username;
+        let password;
+        if (authChallenge.action === 'provideCredentials') {
+            const { credentials } = authChallenge;
+            username = credentials.username;
+            password = credentials.password;
+        }
+        const response = (0, NetworkUtils_js_1.cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction)(authChallenge.action);
+        await this.#continueWithAuth({
+            response,
+            username,
+            password,
+        });
+    }
+    /** @see https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-provideResponse */
+    async provideResponse(overrides) {
+        (0, assert_js_1.assert)(this.#fetchId, 'Network Interception not set-up.');
+        // We need to pass through if the request is already in
+        // AuthRequired phase
+        if (this.interceptPhase === "authRequired" /* Network.InterceptPhase.AuthRequired */) {
+            // We need to use `ProvideCredentials`
+            // As `Default` may cancel the request
+            return await this.#continueWithAuth({
+                response: 'ProvideCredentials',
+            });
+        }
+        // If we don't modify the response
+        // just continue the request
+        if (!overrides.body && !overrides.headers) {
+            return await this.#continueRequest();
+        }
+        const overrideHeaders = this.#getOverrideHeader(overrides.headers, overrides.cookies);
+        const responseHeaders = (0, NetworkUtils_js_1.cdpFetchHeadersFromBidiNetworkHeaders)(overrideHeaders);
+        const responseCode = overrides.statusCode ?? this.#statusCode ?? 200;
+        await this.cdpClient.sendCommand('Fetch.fulfillRequest', {
+            requestId: this.#fetchId,
+            responseCode,
+            responsePhrase: overrides.reasonPhrase,
+            responseHeaders,
+            body: getCdpBodyFromBiDiBytesValue(overrides.body),
+        });
+        this.#interceptPhase = undefined;
+    }
+    async #continueWithAuth(authChallengeResponse) {
         (0, assert_js_1.assert)(this.#fetchId, 'Network Interception not set-up.');
         await this.cdpClient.sendCommand('Fetch.continueWithAuth', {
             requestId: this.#fetchId,
             authChallengeResponse,
         });
         this.#interceptPhase = undefined;
-    }
-    /** @see https://chromedevtools.github.io/devtools-protocol/tot/Fetch/#method-provideResponse */
-    async provideResponse({ responseCode, responsePhrase, responseHeaders, body, }) {
-        (0, assert_js_1.assert)(this.#fetchId, 'Network Interception not set-up.');
-        await this.cdpClient.sendCommand('Fetch.fulfillRequest', {
-            requestId: this.#fetchId,
-            responseCode,
-            responsePhrase,
-            responseHeaders,
-            body,
-        });
-        this.#interceptPhase = undefined;
-    }
-    get #context() {
-        return (this.#response.paused?.frameId ??
-            this.#request.info?.frameId ??
-            this.#request.paused?.frameId ??
-            this.#request.auth?.frameId ??
-            null);
-    }
-    /** Returns the HTTP status code associated with this request if any. */
-    get statusCode() {
-        return (this.#response.paused?.responseStatusCode ??
-            this.#response.extraInfo?.statusCode ??
-            this.#response.info?.status);
     }
     #emitEvent(getEvent) {
         let event;
@@ -24017,11 +24583,11 @@ class NetworkRequest {
         }
         return {
             context: this.#context,
-            navigation: this.#getNavigationId(),
+            navigation: this.#navigationId,
             redirectCount: this.#redirectCount,
             request: this.#getRequestData(),
             // Timestamp should be in milliseconds, while CDP provides it in seconds.
-            timestamp: Math.round((this.#request.info?.wallTime ?? 0) * 1000),
+            timestamp: Math.round((0, NetworkUtils_js_1.getTiming)(this.#request.info?.wallTime) * 1000),
             // Contains isBlocked and intercepts
             ...interceptProps,
         };
@@ -24033,14 +24599,19 @@ class NetworkRequest {
         if (this.#response.info?.fromDiskCache) {
             this.#response.extraInfo = undefined;
         }
-        // TODO: get headers from Fetch.requestPaused
-        const headers = (0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#response.info?.headers);
-        // TODO: get headers from Fetch.requestPaused
-        const authChallenges = this.#authChallenges(this.#response.info?.headers ?? {});
+        const headers = [
+            ...(0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#response.info?.headers),
+            ...(0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#response.extraInfo?.headers),
+            // TODO: Verify how to dedupe these
+            // ...bidiNetworkHeadersFromCdpNetworkHeadersEntries(
+            //   this.#response.paused?.responseHeaders
+            // ),
+        ];
+        const authChallenges = this.#authChallenges;
         return {
             url: this.url,
             protocol: this.#response.info?.protocol ?? '',
-            status: this.statusCode ?? -1, // TODO: Throw an exception or use some other status code?
+            status: this.#statusCode ?? -1, // TODO: Throw an exception or use some other status code?
             statusText: this.#response.info?.statusText ||
                 this.#response.paused?.responseStatusText ||
                 '',
@@ -24058,52 +24629,25 @@ class NetworkRequest {
                 size: 0,
             },
             ...(authChallenges ? { authChallenges } : {}),
+            // @ts-expect-error this is a CDP-specific extension.
+            'goog:securityDetails': this.#response.info?.securityDetails,
         };
     }
-    #getNavigationId() {
-        if (!this.#request.info ||
-            !this.#request.info.loaderId ||
-            // When we navigate all CDP network events have `loaderId`
-            // CDP's `loaderId` and `requestId` match when
-            // that request triggered the loading
-            this.#request.info.loaderId !== this.#request.info.requestId) {
-            return null;
-        }
-        return this.#request.info.loaderId;
-    }
     #getRequestData() {
-        const cookies = this.#request.extraInfo
-            ? NetworkRequest.#getCookies(this.#request.extraInfo.associatedCookies)
-            : [];
-        const headers = (0, NetworkUtils_js_1.bidiNetworkHeadersFromCdpNetworkHeaders)(this.#request.info?.request.headers);
+        const headers = this.#requestHeaders;
         return {
             request: this.#id,
             url: this.url,
-            method: this.method,
+            method: this.#method ?? NetworkRequest.unknownParameter,
             headers,
-            cookies,
+            cookies: this.#cookies,
             headersSize: (0, NetworkUtils_js_1.computeHeadersSize)(headers),
-            // TODO: implement.
-            bodySize: 0,
-            timings: this.#getTimings(),
-        };
-    }
-    // TODO: implement.
-    #getTimings() {
-        return {
-            timeOrigin: 0,
-            requestTime: 0,
-            redirectStart: 0,
-            redirectEnd: 0,
-            fetchStart: 0,
-            dnsStart: 0,
-            dnsEnd: 0,
-            connectStart: 0,
-            connectEnd: 0,
-            tlsStart: 0,
-            requestStart: 0,
-            responseStart: 0,
-            responseEnd: 0,
+            bodySize: this.#bodySize,
+            timings: this.#timings,
+            // @ts-expect-error CDP-specific attribute.
+            'goog:postData': this.#request.info?.request?.postData,
+            'goog:hasPostData': this.#request.info?.request?.hasPostData,
+            'goog:resourceType': this.#request.info?.type,
         };
     }
     #getBeforeRequestEvent() {
@@ -24123,10 +24667,6 @@ class NetworkRequest {
         };
     }
     #getResponseStartedEvent() {
-        (0, assert_js_1.assert)(this.#request.info, 'RequestWillBeSentEvent is not set');
-        (0, assert_js_1.assert)(
-        // The response paused comes before any data for the response
-        this.#response.paused || this.#response.info, 'ResponseReceivedEvent is not set');
         return {
             method: protocol_js_1.ChromiumBidi.Network.EventNames.ResponseStarted,
             params: {
@@ -24136,8 +24676,6 @@ class NetworkRequest {
         };
     }
     #getResponseReceivedEvent() {
-        (0, assert_js_1.assert)(this.#request.info, 'RequestWillBeSentEvent is not set');
-        (0, assert_js_1.assert)(this.#response.info, 'ResponseReceivedEvent is not set');
         return {
             method: protocol_js_1.ChromiumBidi.Network.EventNames.ResponseCompleted,
             params: {
@@ -24152,23 +24690,22 @@ class NetworkRequest {
             this.#request.info?.request.url.endsWith(faviconUrl) ??
             false);
     }
-    #authChallenges(headers) {
-        if (!(this.statusCode === 401 || this.statusCode === 407)) {
+    #getOverrideHeader(headers, cookies) {
+        if (!headers && !cookies) {
             return undefined;
         }
-        const headerName = this.statusCode === 401 ? 'WWW-Authenticate' : 'Proxy-Authenticate';
-        const authChallenges = [];
-        for (const [header, value] of Object.entries(headers)) {
-            // TODO: Do a proper match based on https://httpwg.org/specs/rfc9110.html#credentials
-            // Or verify this works
-            if (header.localeCompare(headerName, undefined, { sensitivity: 'base' }) === 0) {
-                authChallenges.push({
-                    scheme: value.split(' ').at(0) ?? '',
-                    realm: value.match(REALM_REGEX)?.at(0) ?? '',
-                });
-            }
+        let overrideHeaders = headers;
+        const cookieHeader = (0, NetworkUtils_js_1.networkHeaderFromCookieHeaders)(cookies);
+        if (cookieHeader && !overrideHeaders) {
+            overrideHeaders = this.#requestHeaders;
         }
-        return authChallenges;
+        if (cookieHeader && overrideHeaders) {
+            overrideHeaders.filter((header) => header.name.localeCompare('cookie', undefined, {
+                sensitivity: 'base',
+            }) !== 0);
+            overrideHeaders.push(cookieHeader);
+        }
+        return overrideHeaders;
     }
     static #getInitiatorType(initiatorType) {
         switch (initiatorType) {
@@ -24180,15 +24717,27 @@ class NetworkRequest {
                 return 'other';
         }
     }
-    static #getCookies(associatedCookies) {
-        return associatedCookies
-            .filter(({ blockedReasons }) => {
-            return !Array.isArray(blockedReasons) || blockedReasons.length === 0;
-        })
-            .map(({ cookie }) => (0, NetworkUtils_js_1.cdpToBiDiCookie)(cookie));
-    }
 }
 exports.NetworkRequest = NetworkRequest;
+function getCdpBodyFromBiDiBytesValue(body) {
+    let parsedBody;
+    if (body?.type === 'string') {
+        parsedBody = btoa(body.value);
+    }
+    else if (body?.type === 'base64') {
+        parsedBody = body.value;
+    }
+    return parsedBody;
+}
+function getSizeFromBiDiBytesValue(body) {
+    if (body?.type === 'string') {
+        return body.value.length;
+    }
+    else if (body?.type === 'base64') {
+        return atob(body.value).length;
+    }
+    return 0;
+}
 //# sourceMappingURL=NetworkRequest.js.map
 
 /***/ }),
@@ -24206,6 +24755,7 @@ const NetworkRequest_js_1 = __nccwpck_require__(83274);
 const NetworkUtils_js_1 = __nccwpck_require__(920);
 /** Stores network and intercept maps. */
 class NetworkStorage {
+    #browsingContextStorage;
     #eventManager;
     #logger;
     /**
@@ -24215,7 +24765,8 @@ class NetworkStorage {
     #requests = new Map();
     /** A map from intercept ID to track active network intercepts. */
     #intercepts = new Map();
-    constructor(eventManager, browserClient, logger) {
+    constructor(eventManager, browsingContextStorage, browserClient, logger) {
+        this.#browsingContextStorage = browsingContextStorage;
         this.#eventManager = eventManager;
         browserClient.on('Target.detachedFromTarget', ({ sessionId }) => {
             this.disposeRequestMap(sessionId);
@@ -24392,6 +24943,16 @@ class NetworkStorage {
     deleteRequest(id) {
         this.#requests.delete(id);
     }
+    /**
+     * Gets the virtual navigation ID for the given navigable ID.
+     */
+    getVirtualNavigationId(contextId) {
+        if (contextId === undefined) {
+            return null;
+        }
+        return (this.#browsingContextStorage.findContext(contextId)
+            ?.virtualNavigationId ?? null);
+    }
 }
 exports.NetworkStorage = NetworkStorage;
 //# sourceMappingURL=NetworkStorage.js.map
@@ -24421,7 +24982,22 @@ exports.NetworkStorage = NetworkStorage;
  *
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.matchUrlPattern = exports.isSpecialScheme = exports.sameSiteBiDiToCdp = exports.bidiToCdpCookie = exports.deserializeByteValue = exports.cdpToBiDiCookie = exports.cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction = exports.cdpFetchHeadersFromBidiNetworkHeaders = exports.bidiNetworkHeadersFromCdpFetchHeaders = exports.cdpNetworkHeadersFromBidiNetworkHeaders = exports.bidiNetworkHeadersFromCdpNetworkHeaders = exports.computeHeadersSize = void 0;
+exports.computeHeadersSize = computeHeadersSize;
+exports.bidiNetworkHeadersFromCdpNetworkHeaders = bidiNetworkHeadersFromCdpNetworkHeaders;
+exports.bidiNetworkHeadersFromCdpNetworkHeadersEntries = bidiNetworkHeadersFromCdpNetworkHeadersEntries;
+exports.cdpNetworkHeadersFromBidiNetworkHeaders = cdpNetworkHeadersFromBidiNetworkHeaders;
+exports.bidiNetworkHeadersFromCdpFetchHeaders = bidiNetworkHeadersFromCdpFetchHeaders;
+exports.cdpFetchHeadersFromBidiNetworkHeaders = cdpFetchHeadersFromBidiNetworkHeaders;
+exports.networkHeaderFromCookieHeaders = networkHeaderFromCookieHeaders;
+exports.cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction = cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction;
+exports.cdpToBiDiCookie = cdpToBiDiCookie;
+exports.deserializeByteValue = deserializeByteValue;
+exports.bidiToCdpCookie = bidiToCdpCookie;
+exports.sameSiteBiDiToCdp = sameSiteBiDiToCdp;
+exports.isSpecialScheme = isSpecialScheme;
+exports.matchUrlPattern = matchUrlPattern;
+exports.bidiBodySizeFromCdpPostDataEntries = bidiBodySizeFromCdpPostDataEntries;
+exports.getTiming = getTiming;
 const ErrorResponse_js_1 = __nccwpck_require__(75315);
 const Base64_js_1 = __nccwpck_require__(36679);
 const UrlPattern_js_1 = __nccwpck_require__(66223);
@@ -24431,8 +25007,7 @@ function computeHeadersSize(headers) {
     }, '');
     return new TextEncoder().encode(requestHeaders).length;
 }
-exports.computeHeadersSize = computeHeadersSize;
-/** Converts from CDP Network domain headers to Bidi network headers. */
+/** Converts from CDP Network domain headers to BiDi network headers. */
 function bidiNetworkHeadersFromCdpNetworkHeaders(headers) {
     if (!headers) {
         return [];
@@ -24445,7 +25020,19 @@ function bidiNetworkHeadersFromCdpNetworkHeaders(headers) {
         },
     }));
 }
-exports.bidiNetworkHeadersFromCdpNetworkHeaders = bidiNetworkHeadersFromCdpNetworkHeaders;
+/** Converts from CDP Fetch domain headers to BiDi network headers. */
+function bidiNetworkHeadersFromCdpNetworkHeadersEntries(headers) {
+    if (!headers) {
+        return [];
+    }
+    return headers.map(({ name, value }) => ({
+        name,
+        value: {
+            type: 'string',
+            value,
+        },
+    }));
+}
 /** Converts from Bidi network headers to CDP Network domain headers. */
 function cdpNetworkHeadersFromBidiNetworkHeaders(headers) {
     if (headers === undefined) {
@@ -24457,7 +25044,6 @@ function cdpNetworkHeadersFromBidiNetworkHeaders(headers) {
         return result;
     }, {});
 }
-exports.cdpNetworkHeadersFromBidiNetworkHeaders = cdpNetworkHeadersFromBidiNetworkHeaders;
 /** Converts from CDP Fetch domain header entries to Bidi network headers. */
 function bidiNetworkHeadersFromCdpFetchHeaders(headers) {
     if (!headers) {
@@ -24471,7 +25057,6 @@ function bidiNetworkHeadersFromCdpFetchHeaders(headers) {
         },
     }));
 }
-exports.bidiNetworkHeadersFromCdpFetchHeaders = bidiNetworkHeadersFromCdpFetchHeaders;
 /** Converts from Bidi network headers to CDP Fetch domain header entries. */
 function cdpFetchHeadersFromBidiNetworkHeaders(headers) {
     if (headers === undefined) {
@@ -24482,7 +25067,28 @@ function cdpFetchHeadersFromBidiNetworkHeaders(headers) {
         value: value.value,
     }));
 }
-exports.cdpFetchHeadersFromBidiNetworkHeaders = cdpFetchHeadersFromBidiNetworkHeaders;
+function networkHeaderFromCookieHeaders(headers) {
+    if (headers === undefined) {
+        return undefined;
+    }
+    const value = headers.reduce((acc, value, index) => {
+        if (index > 0) {
+            acc += ';';
+        }
+        const cookieValue = value.value.type === 'base64'
+            ? btoa(value.value.value)
+            : value.value.value;
+        acc += `${value.name}=${cookieValue}`;
+        return acc;
+    }, '');
+    return {
+        name: 'Cookie',
+        value: {
+            type: 'string',
+            value,
+        },
+    };
+}
 /** Converts from Bidi auth action to CDP auth challenge response. */
 function cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction(action) {
     switch (action) {
@@ -24494,7 +25100,6 @@ function cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction(action) {
             return 'ProvideCredentials';
     }
 }
-exports.cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction = cdpAuthChallengeResponseFromBidiAuthContinueWithAuthAction;
 /**
  * Converts from CDP Network domain cookie to BiDi network cookie.
  * * https://chromedevtools.github.io/devtools-protocol/tot/Network/#type-Cookie
@@ -24528,7 +25133,6 @@ function cdpToBiDiCookie(cookie) {
     }
     return result;
 }
-exports.cdpToBiDiCookie = cdpToBiDiCookie;
 /**
  * Decodes a byte value to a string.
  * @param {Network.BytesValue} value
@@ -24540,7 +25144,6 @@ function deserializeByteValue(value) {
     }
     return value.value;
 }
-exports.deserializeByteValue = deserializeByteValue;
 /**
  * Converts from BiDi set network cookie params to CDP Network domain cookie.
  * * https://w3c.github.io/webdriver-bidi/#type-network-Cookie
@@ -24555,9 +25158,12 @@ function bidiToCdpCookie(params, partitionKey) {
         path: params.cookie.path ?? '/',
         secure: params.cookie.secure ?? false,
         httpOnly: params.cookie.httpOnly ?? false,
-        // CDP's `partitionKey` is the BiDi's `partition.sourceOrigin`.
         ...(partitionKey.sourceOrigin !== undefined && {
-            partitionKey: partitionKey.sourceOrigin,
+            partitionKey: {
+                hasCrossSiteAncestor: false,
+                // CDP's `partitionKey.topLevelSite` is the BiDi's `partition.sourceOrigin`.
+                topLevelSite: partitionKey.sourceOrigin,
+            },
         }),
         ...(params.cookie.expiry !== undefined && {
             expires: params.cookie.expiry,
@@ -24584,7 +25190,6 @@ function bidiToCdpCookie(params, partitionKey) {
     }
     return result;
 }
-exports.bidiToCdpCookie = bidiToCdpCookie;
 function sameSiteCdpToBiDi(sameSite) {
     switch (sameSite) {
         case 'Strict':
@@ -24610,7 +25215,6 @@ function sameSiteBiDiToCdp(sameSite) {
     }
     throw new ErrorResponse_js_1.InvalidArgumentException(`Unknown 'sameSite' value ${sameSite}`);
 }
-exports.sameSiteBiDiToCdp = sameSiteBiDiToCdp;
 /**
  * Returns true if the given protocol is special.
  * Special protocols are those that have a default port.
@@ -24622,7 +25226,6 @@ exports.sameSiteBiDiToCdp = sameSiteBiDiToCdp;
 function isSpecialScheme(protocol) {
     return ['ftp', 'file', 'http', 'https', 'ws', 'wss'].includes(protocol.replace(/:$/, ''));
 }
-exports.isSpecialScheme = isSpecialScheme;
 /** Matches the given URLPattern against the given URL. */
 function matchUrlPattern(urlPattern, url) {
     switch (urlPattern.type) {
@@ -24640,7 +25243,22 @@ function matchUrlPattern(urlPattern, url) {
             return new UrlPattern_js_1.URLPattern(urlPattern).test(url);
     }
 }
-exports.matchUrlPattern = matchUrlPattern;
+function bidiBodySizeFromCdpPostDataEntries(entries) {
+    let size = 0;
+    for (const entry of entries) {
+        size += atob(entry.bytes ?? '').length;
+    }
+    return size;
+}
+function getTiming(timing) {
+    if (!timing) {
+        return 0;
+    }
+    if (timing < 0) {
+        return 0;
+    }
+    return timing;
+}
 //# sourceMappingURL=NetworkUtils.js.map
 
 /***/ }),
@@ -25817,12 +26435,12 @@ exports.ScriptProcessor = ScriptProcessor;
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.parseSharedId = exports.getSharedId = void 0;
+exports.getSharedId = getSharedId;
+exports.parseSharedId = parseSharedId;
 const SHARED_ID_DIVIDER = '_element_';
 function getSharedId(frameId, documentId, backendNodeId) {
     return `f.${frameId}.d.${documentId}.e.${backendNodeId}`;
 }
-exports.getSharedId = getSharedId;
 function parseLegacySharedId(sharedId) {
     const match = sharedId.match(new RegExp(`(.*)${SHARED_ID_DIVIDER}(.*)`));
     if (!match) {
@@ -25872,7 +26490,6 @@ function parseSharedId(sharedId) {
         backendNodeId,
     };
 }
-exports.parseSharedId = parseSharedId;
 //# sourceMappingURL=SharedId.js.map
 
 /***/ }),
@@ -26127,6 +26744,7 @@ exports.EventManager = void 0;
 const protocol_js_1 = __nccwpck_require__(40315);
 const Buffer_js_1 = __nccwpck_require__(85746);
 const DefaultMap_js_1 = __nccwpck_require__(62038);
+const DistinctValues_js_1 = __nccwpck_require__(31930);
 const EventEmitter_js_1 = __nccwpck_require__(76111);
 const IdWrapper_js_1 = __nccwpck_require__(35870);
 const OutgoingMessage_js_1 = __nccwpck_require__(57753);
@@ -26174,10 +26792,15 @@ class EventManager extends EventEmitter_js_1.EventEmitter {
     #lastMessageSent = new Map();
     #subscriptionManager;
     #browsingContextStorage;
+    /**
+     * Map of event name to hooks to be called when client is subscribed to the event.
+     */
+    #subscribeHooks;
     constructor(browsingContextStorage) {
         super();
         this.#browsingContextStorage = browsingContextStorage;
         this.#subscriptionManager = new SubscriptionManager_js_1.SubscriptionManager(browsingContextStorage);
+        this.#subscribeHooks = new DefaultMap_js_1.DefaultMap(() => []);
     }
     get subscriptionManager() {
         return this.#subscriptionManager;
@@ -26187,6 +26810,9 @@ class EventManager extends EventEmitter_js_1.EventEmitter {
      */
     static #getMapKey(eventName, browsingContext, channel) {
         return JSON.stringify({ eventName, browsingContext, channel });
+    }
+    addSubscribeHook(event, hook) {
+        this.#subscribeHooks.get(event).push(hook);
     }
     registerEvent(event, contextId) {
         this.registerPromiseEvent(Promise.resolve({
@@ -26218,9 +26844,13 @@ class EventManager extends EventEmitter_js_1.EventEmitter {
                 this.#browsingContextStorage.getContext(contextId);
             }
         }
+        // List of the subscription items that were actually added. Each contains a specific
+        // event and context. No domain event (like "network") or global context subscription
+        // (like null) are included.
+        const addedSubscriptionItems = [];
         for (const eventName of eventNames) {
             for (const contextId of contextIds) {
-                this.#subscriptionManager.subscribe(eventName, contextId, channel);
+                addedSubscriptionItems.push(...this.#subscriptionManager.subscribe(eventName, contextId, channel));
                 for (const eventWrapper of this.#getBufferedEvents(eventName, contextId, channel)) {
                     // The order of the events is important.
                     this.emit("event" /* EventManagerEvents.Event */, {
@@ -26231,6 +26861,13 @@ class EventManager extends EventEmitter_js_1.EventEmitter {
                 }
             }
         }
+        // Iterate over all new subscription items and call hooks if any. There can be
+        // duplicates, e.g. when subscribing to the whole domain and some specific event in
+        // the same time ("network", "network.responseCompleted"). `distinctValues` guarantees
+        // that hooks are called only once per pair event + context.
+        (0, DistinctValues_js_1.distinctValues)(addedSubscriptionItems).forEach(({ contextId, event }) => {
+            this.#subscribeHooks.get(event).forEach((hook) => hook(contextId));
+        });
         await this.toggleModulesIfNeeded();
     }
     async unsubscribe(eventNames, contextIds, channel) {
@@ -26337,7 +26974,7 @@ class SessionProcessor {
     status() {
         return { ready: false, message: 'already connected' };
     }
-    async create(_params) {
+    async new(_params) {
         // Since mapper exists, there is a session already.
         // Still the mapper can handle capabilities for us.
         // Currently, only Puppeteer calls here but, eventually, every client
@@ -26392,7 +27029,9 @@ exports.SessionProcessor = SessionProcessor;
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.SubscriptionManager = exports.unrollEvents = exports.cartesianProduct = void 0;
+exports.SubscriptionManager = void 0;
+exports.cartesianProduct = cartesianProduct;
+exports.unrollEvents = unrollEvents;
 const protocol_js_1 = __nccwpck_require__(40315);
 const events_js_1 = __nccwpck_require__(93344);
 /**
@@ -26404,7 +27043,6 @@ const events_js_1 = __nccwpck_require__(93344);
 function cartesianProduct(...a) {
     return a.reduce((a, b) => a.flatMap((d) => b.map((e) => [d, e].flat())));
 }
-exports.cartesianProduct = cartesianProduct;
 /** Expands "AllEvents" events into atomic events. */
 function unrollEvents(events) {
     const allEvents = new Set();
@@ -26433,7 +27071,6 @@ function unrollEvents(events) {
     }
     return [...allEvents.values()];
 }
-exports.unrollEvents = unrollEvents;
 class SubscriptionManager {
     #subscriptionPriority = 0;
     // BrowsingContext `null` means the event has subscription across all the
@@ -26525,23 +27162,37 @@ class SubscriptionManager {
         }
         return false;
     }
+    /**
+     * Subscribes to event in the given context and channel.
+     * @param {EventNames} event
+     * @param {BrowsingContext.BrowsingContext | null} contextId
+     * @param {BidiPlusChannel} channel
+     * @return {SubscriptionItem[]} List of
+     * subscriptions. If the event is a whole module, it will return all the specific
+     * events. If the contextId is null, it will return all the top-level contexts which were
+     * not subscribed before the command.
+     */
     subscribe(event, contextId, channel) {
         // All the subscriptions are handled on the top-level contexts.
         contextId = this.#browsingContextStorage.findTopLevelContextId(contextId);
         // Check if subscribed event is a whole module
         switch (event) {
             case protocol_js_1.ChromiumBidi.BiDiModule.BrowsingContext:
-                Object.values(protocol_js_1.ChromiumBidi.BrowsingContext.EventNames).map((specificEvent) => this.subscribe(specificEvent, contextId, channel));
-                return;
+                return Object.values(protocol_js_1.ChromiumBidi.BrowsingContext.EventNames)
+                    .map((specificEvent) => this.subscribe(specificEvent, contextId, channel))
+                    .flat();
             case protocol_js_1.ChromiumBidi.BiDiModule.Log:
-                Object.values(protocol_js_1.ChromiumBidi.Log.EventNames).map((specificEvent) => this.subscribe(specificEvent, contextId, channel));
-                return;
+                return Object.values(protocol_js_1.ChromiumBidi.Log.EventNames)
+                    .map((specificEvent) => this.subscribe(specificEvent, contextId, channel))
+                    .flat();
             case protocol_js_1.ChromiumBidi.BiDiModule.Network:
-                Object.values(protocol_js_1.ChromiumBidi.Network.EventNames).map((specificEvent) => this.subscribe(specificEvent, contextId, channel));
-                return;
+                return Object.values(protocol_js_1.ChromiumBidi.Network.EventNames)
+                    .map((specificEvent) => this.subscribe(specificEvent, contextId, channel))
+                    .flat();
             case protocol_js_1.ChromiumBidi.BiDiModule.Script:
-                Object.values(protocol_js_1.ChromiumBidi.Script.EventNames).map((specificEvent) => this.subscribe(specificEvent, contextId, channel));
-                return;
+                return Object.values(protocol_js_1.ChromiumBidi.Script.EventNames)
+                    .map((specificEvent) => this.subscribe(specificEvent, contextId, channel))
+                    .flat();
             default:
             // Intentionally left empty.
         }
@@ -26553,11 +27204,20 @@ class SubscriptionManager {
             contextToEventMap.set(contextId, new Map());
         }
         const eventMap = contextToEventMap.get(contextId);
-        // Do not re-subscribe to events to keep the priority.
-        if (eventMap.has(event)) {
-            return;
+        const affectedContextIds = (contextId === null
+            ? this.#browsingContextStorage.getTopLevelContexts().map((c) => c.id)
+            : [contextId])
+            // There can be contexts that are already subscribed to the event. Do not include
+            // them to the output.
+            .filter((contextId) => !this.isSubscribedTo(event, contextId));
+        if (!eventMap.has(event)) {
+            // Add subscription only if it's not already subscribed.
+            eventMap.set(event, this.#subscriptionPriority++);
         }
-        eventMap.set(event, this.#subscriptionPriority++);
+        return affectedContextIds.map((contextId) => ({
+            event,
+            contextId,
+        }));
     }
     /**
      * Unsubscribes atomically from all events in the given contexts and channel.
@@ -26620,7 +27280,8 @@ exports.SubscriptionManager = SubscriptionManager;
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.assertSupportedEvent = exports.isCdpEvent = void 0;
+exports.isCdpEvent = isCdpEvent;
+exports.assertSupportedEvent = assertSupportedEvent;
 /**
  * Copyright 2023 Google LLC.
  * Copyright (c) Microsoft Corporation.
@@ -26645,7 +27306,6 @@ const protocol_js_1 = __nccwpck_require__(40315);
 function isCdpEvent(name) {
     return (name.split('.').at(0)?.startsWith(protocol_js_1.ChromiumBidi.BiDiModule.Cdp) ?? false);
 }
-exports.isCdpEvent = isCdpEvent;
 /**
  * Asserts that the given event is known to BiDi or BiDi+, or throws otherwise.
  */
@@ -26654,7 +27314,6 @@ function assertSupportedEvent(name) {
         throw new protocol_js_1.InvalidArgumentException(`Unknown event: ${name}`);
     }
 }
-exports.assertSupportedEvent = assertSupportedEvent;
 //# sourceMappingURL=events.js.map
 
 /***/ }),
@@ -26704,7 +27363,7 @@ class StorageProcessor {
         // `sourceOrigin` partition key, only cookies with the requested source origin
         // are returned.
         (c) => partitionKey.sourceOrigin === undefined ||
-            c.partitionKey === partitionKey.sourceOrigin)
+            c.partitionKey?.topLevelSite === partitionKey.sourceOrigin)
             .filter((cdpCookie) => {
             const bidiCookie = (0, NetworkUtils_js_1.cdpToBiDiCookie)(cdpCookie);
             return this.#matchCookie(bidiCookie, params.filter);
@@ -26743,7 +27402,7 @@ class StorageProcessor {
         // `sourceOrigin` partition key, only cookies with the requested source origin
         // are returned.
         (c) => partitionKey.sourceOrigin === undefined ||
-            c.partitionKey === partitionKey.sourceOrigin)
+            c.partitionKey?.topLevelSite === partitionKey.sourceOrigin)
             .map((c) => (0, NetworkUtils_js_1.cdpToBiDiCookie)(c))
             .filter((c) => this.#matchCookie(c, params.filter));
         return {
@@ -27278,7 +27937,7 @@ __exportStar(__nccwpck_require__(37581), exports);
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.base64ToString = void 0;
+exports.base64ToString = base64ToString;
 /**
  * Encodes a string to base64.
  *
@@ -27294,7 +27953,6 @@ function base64ToString(base64Str) {
     // Available only if run in a NodeJS context.
     return Buffer.from(base64Str, 'base64').toString('ascii');
 }
-exports.base64ToString = base64ToString;
 //# sourceMappingURL=Base64.js.map
 
 /***/ }),
@@ -27426,10 +28084,17 @@ exports.Deferred = void 0;
 class Deferred {
     #isFinished = false;
     #promise;
+    #result;
     #resolve;
     #reject;
     get isFinished() {
         return this.#isFinished;
+    }
+    get result() {
+        if (!this.#isFinished) {
+            throw new Error('Deferred is not finished yet');
+        }
+        return this.#result;
     }
     constructor() {
         this.#promise = new Promise((resolve, reject) => {
@@ -27449,6 +28114,7 @@ class Deferred {
         return this.#promise.catch(onRejected);
     }
     resolve(value) {
+        this.#result = value;
         if (!this.#isFinished) {
             this.#isFinished = true;
             this.#resolve(value);
@@ -27467,6 +28133,71 @@ class Deferred {
 }
 exports.Deferred = Deferred;
 //# sourceMappingURL=Deferred.js.map
+
+/***/ }),
+
+/***/ 31930:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/*
+ * Copyright 2024 Google LLC.
+ * Copyright (c) Microsoft Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.distinctValues = distinctValues;
+exports.deterministicJSONStringify = deterministicJSONStringify;
+/**
+ * Returns an array of distinct values. Order is not guaranteed.
+ * @param values - The values to filter. Should be JSON-serializable.
+ * @return - An array of distinct values.
+ */
+function distinctValues(values) {
+    const map = new Map();
+    for (const value of values) {
+        map.set(deterministicJSONStringify(value), value);
+    }
+    return Array.from(map.values());
+}
+/**
+ * Returns a stringified version of the object with keys sorted. This is required to
+ * ensure that the stringified version of an object is deterministic independent of the
+ * order of keys.
+ * @param obj
+ * @return {string}
+ */
+function deterministicJSONStringify(obj) {
+    return JSON.stringify(normalizeObject(obj));
+}
+function normalizeObject(obj) {
+    if (obj === undefined ||
+        obj === null ||
+        Array.isArray(obj) ||
+        typeof obj !== 'object') {
+        return obj;
+    }
+    // Copy the original object key and values to a new object in sorted order.
+    const newObj = {};
+    for (const key of Object.keys(obj).sort()) {
+        const value = obj[key];
+        newObj[key] = normalizeObject(value); // Recursively sort nested objects
+    }
+    return newObj;
+}
+//# sourceMappingURL=DistinctValues.js.map
 
 /***/ }),
 
@@ -27548,6 +28279,51 @@ class EventEmitter {
 }
 exports.EventEmitter = EventEmitter;
 //# sourceMappingURL=EventEmitter.js.map
+
+/***/ }),
+
+/***/ 63728:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/*
+ * Copyright 2024 Google LLC.
+ * Copyright (c) Microsoft Corporation.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.isSingleComplexGrapheme = isSingleComplexGrapheme;
+exports.isSingleGrapheme = isSingleGrapheme;
+/**
+ * Check if the given string is a single complex grapheme. A complex grapheme is one that
+ * is made up of multiple characters.
+ */
+function isSingleComplexGrapheme(value) {
+    return isSingleGrapheme(value) && value.length > 1;
+}
+/**
+ * Check if the given string is a single grapheme.
+ */
+function isSingleGrapheme(value) {
+    // Theoretically there can be some strings considered a grapheme in some locales, like
+    // slovak "ch" digraph. Use english locale for consistency.
+    // https://www.unicode.org/reports/tr29/#Grapheme_Cluster_Boundaries
+    const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+    return [...segmenter.segment(value)].length === 1;
+}
+//# sourceMappingURL=GraphemeTools.js.map
 
 /***/ }),
 
@@ -27780,7 +28556,7 @@ if ('URLPattern' in globalThis) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.assert = void 0;
+exports.assert = assert;
 /**
  * Copyright 2023 Google LLC.
  * Copyright (c) Microsoft Corporation.
@@ -27802,7 +28578,6 @@ function assert(predicate, message) {
         throw new Error(message ?? 'Internal assertion failed.');
     }
 }
-exports.assert = assert;
 //# sourceMappingURL=assert.js.map
 
 /***/ }),
@@ -27866,12 +28641,11 @@ var LogType;
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.inchesFromCm = void 0;
+exports.inchesFromCm = inchesFromCm;
 /** @return Given an input in cm, convert it to inches. */
 function inchesFromCm(cm) {
     return cm / 2.54;
 }
-exports.inchesFromCm = inchesFromCm;
 //# sourceMappingURL=unitConversions.js.map
 
 /***/ }),
@@ -27898,7 +28672,7 @@ exports.inchesFromCm = inchesFromCm;
  * limitations under the License.
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.uuidv4 = void 0;
+exports.uuidv4 = uuidv4;
 /**
  * Generates a random v4 UUID, as specified in RFC4122.
  *
@@ -27941,7 +28715,6 @@ function uuidv4() {
         bytesToHex(randomValues.subarray(10, 16)),
     ].join('-');
 }
-exports.uuidv4 = uuidv4;
 //# sourceMappingURL=uuid.js.map
 
 /***/ }),
@@ -29368,14 +30141,17 @@ function useColors() {
 		return false;
 	}
 
+	let m;
+
 	// Is webkit? http://stackoverflow.com/a/16459606/376773
 	// document is undefined in react-native: https://github.com/facebook/react-native/pull/1632
+	// eslint-disable-next-line no-return-assign
 	return (typeof document !== 'undefined' && document.documentElement && document.documentElement.style && document.documentElement.style.WebkitAppearance) ||
 		// Is firebug? http://stackoverflow.com/a/398120/376773
 		(typeof window !== 'undefined' && window.console && (window.console.firebug || (window.console.exception && window.console.table))) ||
 		// Is firefox >= v31?
 		// https://developer.mozilla.org/en-US/docs/Tools/Web_Console#Styling_messages
-		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/) && parseInt(RegExp.$1, 10) >= 31) ||
+		(typeof navigator !== 'undefined' && navigator.userAgent && (m = navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)) && parseInt(m[1], 10) >= 31) ||
 		// Double check webkit in userAgent just in case we are in a worker
 		(typeof navigator !== 'undefined' && navigator.userAgent && navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/));
 }
@@ -29685,24 +30461,62 @@ function setup(env) {
 		createDebug.names = [];
 		createDebug.skips = [];
 
-		let i;
-		const split = (typeof namespaces === 'string' ? namespaces : '').split(/[\s,]+/);
-		const len = split.length;
+		const split = (typeof namespaces === 'string' ? namespaces : '')
+			.trim()
+			.replace(' ', ',')
+			.split(',')
+			.filter(Boolean);
 
-		for (i = 0; i < len; i++) {
-			if (!split[i]) {
-				// ignore empty strings
-				continue;
-			}
-
-			namespaces = split[i].replace(/\*/g, '.*?');
-
-			if (namespaces[0] === '-') {
-				createDebug.skips.push(new RegExp('^' + namespaces.slice(1) + '$'));
+		for (const ns of split) {
+			if (ns[0] === '-') {
+				createDebug.skips.push(ns.slice(1));
 			} else {
-				createDebug.names.push(new RegExp('^' + namespaces + '$'));
+				createDebug.names.push(ns);
 			}
 		}
+	}
+
+	/**
+	 * Checks if the given string matches a namespace template, honoring
+	 * asterisks as wildcards.
+	 *
+	 * @param {String} search
+	 * @param {String} template
+	 * @return {Boolean}
+	 */
+	function matchesTemplate(search, template) {
+		let searchIndex = 0;
+		let templateIndex = 0;
+		let starIndex = -1;
+		let matchIndex = 0;
+
+		while (searchIndex < search.length) {
+			if (templateIndex < template.length && (template[templateIndex] === search[searchIndex] || template[templateIndex] === '*')) {
+				// Match character or proceed with wildcard
+				if (template[templateIndex] === '*') {
+					starIndex = templateIndex;
+					matchIndex = searchIndex;
+					templateIndex++; // Skip the '*'
+				} else {
+					searchIndex++;
+					templateIndex++;
+				}
+			} else if (starIndex !== -1) { // eslint-disable-line no-negated-condition
+				// Backtrack to the last '*' and try to match more characters
+				templateIndex = starIndex + 1;
+				matchIndex++;
+				searchIndex = matchIndex;
+			} else {
+				return false; // No match
+			}
+		}
+
+		// Handle trailing '*' in template
+		while (templateIndex < template.length && template[templateIndex] === '*') {
+			templateIndex++;
+		}
+
+		return templateIndex === template.length;
 	}
 
 	/**
@@ -29713,8 +30527,8 @@ function setup(env) {
 	*/
 	function disable() {
 		const namespaces = [
-			...createDebug.names.map(toNamespace),
-			...createDebug.skips.map(toNamespace).map(namespace => '-' + namespace)
+			...createDebug.names,
+			...createDebug.skips.map(namespace => '-' + namespace)
 		].join(',');
 		createDebug.enable('');
 		return namespaces;
@@ -29728,39 +30542,19 @@ function setup(env) {
 	* @api public
 	*/
 	function enabled(name) {
-		if (name[name.length - 1] === '*') {
-			return true;
-		}
-
-		let i;
-		let len;
-
-		for (i = 0, len = createDebug.skips.length; i < len; i++) {
-			if (createDebug.skips[i].test(name)) {
+		for (const skip of createDebug.skips) {
+			if (matchesTemplate(name, skip)) {
 				return false;
 			}
 		}
 
-		for (i = 0, len = createDebug.names.length; i < len; i++) {
-			if (createDebug.names[i].test(name)) {
+		for (const ns of createDebug.names) {
+			if (matchesTemplate(name, ns)) {
 				return true;
 			}
 		}
 
 		return false;
-	}
-
-	/**
-	* Convert regexp to namespace
-	*
-	* @param {RegExp} regxep
-	* @return {String} namespace
-	* @api private
-	*/
-	function toNamespace(regexp) {
-		return regexp.toString()
-			.substring(2, regexp.toString().length - 2)
-			.replace(/\.\*\?$/, '*');
 	}
 
 	/**
@@ -30004,11 +30798,11 @@ function getDate() {
 }
 
 /**
- * Invokes `util.format()` with the specified arguments and writes to stderr.
+ * Invokes `util.formatWithOptions()` with the specified arguments and writes to stderr.
  */
 
 function log(...args) {
-	return process.stderr.write(util.format(...args) + '\n');
+	return process.stderr.write(util.formatWithOptions(exports.inspectOpts, ...args) + '\n');
 }
 
 /**
@@ -48824,7 +49618,7 @@ var y = d * 365.25;
  * @api public
  */
 
-module.exports = function(val, options) {
+module.exports = function (val, options) {
   options = options || {};
   var type = typeof val;
   if (type === 'string' && val.length > 0) {
@@ -58157,24 +58951,6 @@ module.exports = pump
 
 /***/ }),
 
-/***/ 5322:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-module.exports = (typeof process !== 'undefined' && typeof process.nextTick === 'function')
-  ? process.nextTick.bind(process)
-  : __nccwpck_require__(71031)
-
-
-/***/ }),
-
-/***/ 71031:
-/***/ ((module) => {
-
-module.exports = typeof queueMicrotask === 'function' ? queueMicrotask : (fn) => Promise.resolve().then(fn)
-
-
-/***/ }),
-
 /***/ 89200:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
@@ -58420,6 +59196,8 @@ const Range = __nccwpck_require__(9828)
 /***/ 9828:
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
+const SPACE_CHARACTERS = /\s+/g
+
 // hoisted class for cyclic dependency
 class Range {
   constructor (range, options) {
@@ -58440,7 +59218,7 @@ class Range {
       // just put it in the set and return
       this.raw = range.value
       this.set = [[range]]
-      this.format()
+      this.formatted = undefined
       return this
     }
 
@@ -58451,10 +59229,7 @@ class Range {
     // First reduce all whitespace as much as possible so we do not have to rely
     // on potentially slow regexes like \s*. This is then stored and used for
     // future error messages as well.
-    this.raw = range
-      .trim()
-      .split(/\s+/)
-      .join(' ')
+    this.raw = range.trim().replace(SPACE_CHARACTERS, ' ')
 
     // First, split on ||
     this.set = this.raw
@@ -58488,14 +59263,29 @@ class Range {
       }
     }
 
-    this.format()
+    this.formatted = undefined
+  }
+
+  get range () {
+    if (this.formatted === undefined) {
+      this.formatted = ''
+      for (let i = 0; i < this.set.length; i++) {
+        if (i > 0) {
+          this.formatted += '||'
+        }
+        const comps = this.set[i]
+        for (let k = 0; k < comps.length; k++) {
+          if (k > 0) {
+            this.formatted += ' '
+          }
+          this.formatted += comps[k].toString().trim()
+        }
+      }
+    }
+    return this.formatted
   }
 
   format () {
-    this.range = this.set
-      .map((comps) => comps.join(' ').trim())
-      .join('||')
-      .trim()
     return this.range
   }
 
@@ -58620,8 +59410,8 @@ class Range {
 
 module.exports = Range
 
-const LRU = __nccwpck_require__(81196)
-const cache = new LRU({ max: 1000 })
+const LRU = __nccwpck_require__(15339)
+const cache = new LRU()
 
 const parseOptions = __nccwpck_require__(40785)
 const Comparator = __nccwpck_require__(91532)
@@ -58892,9 +59682,10 @@ const replaceGTE0 = (comp, options) => {
 // 1.2 - 3.4.5 => >=1.2.0 <=3.4.5
 // 1.2.3 - 3.4 => >=1.2.0 <3.5.0-0 Any 3.4.x will do
 // 1.2 - 3.4 => >=1.2.0 <3.5.0-0
+// TODO build?
 const hyphenReplace = incPr => ($0,
   from, fM, fm, fp, fpr, fb,
-  to, tM, tm, tp, tpr, tb) => {
+  to, tM, tm, tp, tpr) => {
   if (isX(fM)) {
     from = ''
   } else if (isX(fm)) {
@@ -58968,7 +59759,7 @@ const testSet = (set, version, options) => {
 
 const debug = __nccwpck_require__(50427)
 const { MAX_LENGTH, MAX_SAFE_INTEGER } = __nccwpck_require__(42293)
-const { safeRe: re, t } = __nccwpck_require__(9523)
+const { safeRe: re, safeSrc: src, t } = __nccwpck_require__(9523)
 
 const parseOptions = __nccwpck_require__(40785)
 const { compareIdentifiers } = __nccwpck_require__(92463)
@@ -58978,7 +59769,7 @@ class SemVer {
 
     if (version instanceof SemVer) {
       if (version.loose === !!options.loose &&
-          version.includePrerelease === !!options.includePrerelease) {
+        version.includePrerelease === !!options.includePrerelease) {
         return version
       } else {
         version = version.version
@@ -59126,7 +59917,7 @@ class SemVer {
     do {
       const a = this.build[i]
       const b = other.build[i]
-      debug('prerelease compare', i, a, b)
+      debug('build compare', i, a, b)
       if (a === undefined && b === undefined) {
         return 0
       } else if (b === undefined) {
@@ -59144,6 +59935,20 @@ class SemVer {
   // preminor will bump the version up to the next minor release, and immediately
   // down to pre-release. premajor and prepatch work the same way.
   inc (release, identifier, identifierBase) {
+    if (release.startsWith('pre')) {
+      if (!identifier && identifierBase === false) {
+        throw new Error('invalid increment argument: identifier is empty')
+      }
+      // Avoid an invalid semver results
+      if (identifier) {
+        const r = new RegExp(`^${this.options.loose ? src[t.PRERELEASELOOSE] : src[t.PRERELEASE]}$`)
+        const match = `-${identifier}`.match(r)
+        if (!match || match[1] !== identifier) {
+          throw new Error(`invalid identifier: ${identifier}`)
+        }
+      }
+    }
+
     switch (release) {
       case 'premajor':
         this.prerelease.length = 0
@@ -59173,6 +59978,12 @@ class SemVer {
           this.inc('patch', identifier, identifierBase)
         }
         this.inc('pre', identifier, identifierBase)
+        break
+      case 'release':
+        if (this.prerelease.length === 0) {
+          throw new Error(`version ${this.raw} is not a prerelease`)
+        }
+        this.prerelease.length = 0
         break
 
       case 'major':
@@ -59216,10 +60027,6 @@ class SemVer {
       // 1.0.0 'pre' would become 1.0.0-0 which is the wrong direction.
       case 'pre': {
         const base = Number(identifierBase) ? 1 : 0
-
-        if (!identifier && identifierBase === false) {
-          throw new Error('invalid increment argument: identifier is empty')
-        }
 
         if (this.prerelease.length === 0) {
           this.prerelease = [base]
@@ -59479,20 +60286,13 @@ const diff = (version1, version2) => {
       return 'major'
     }
 
-    // Otherwise it can be determined by checking the high version
-
-    if (highVersion.patch) {
-      // anything higher than a patch bump would result in the wrong version
+    // If the main part has no difference
+    if (lowVersion.compareMain(highVersion) === 0) {
+      if (lowVersion.minor && !lowVersion.patch) {
+        return 'minor'
+      }
       return 'patch'
     }
-
-    if (highVersion.minor) {
-      // anything higher than a minor bump would result in the wrong version
-      return 'minor'
-    }
-
-    // bumping major/minor/patch all have same result
-    return 'major'
   }
 
   // add the `pre` prefix if we are going to a prerelease version
@@ -59915,6 +60715,53 @@ module.exports = {
 
 /***/ }),
 
+/***/ 15339:
+/***/ ((module) => {
+
+class LRUCache {
+  constructor () {
+    this.max = 1000
+    this.map = new Map()
+  }
+
+  get (key) {
+    const value = this.map.get(key)
+    if (value === undefined) {
+      return undefined
+    } else {
+      // Remove the key from the map and add it to the end
+      this.map.delete(key)
+      this.map.set(key, value)
+      return value
+    }
+  }
+
+  delete (key) {
+    return this.map.delete(key)
+  }
+
+  set (key, value) {
+    const deleted = this.delete(key)
+
+    if (!deleted && value !== undefined) {
+      // If cache is full, delete the least recently used item
+      if (this.map.size >= this.max) {
+        const firstKey = this.map.keys().next().value
+        this.delete(firstKey)
+      }
+
+      this.map.set(key, value)
+    }
+
+    return this
+  }
+}
+
+module.exports = LRUCache
+
+
+/***/ }),
+
 /***/ 40785:
 /***/ ((module) => {
 
@@ -59952,6 +60799,7 @@ exports = module.exports = {}
 const re = exports.re = []
 const safeRe = exports.safeRe = []
 const src = exports.src = []
+const safeSrc = exports.safeSrc = []
 const t = exports.t = {}
 let R = 0
 
@@ -59984,6 +60832,7 @@ const createToken = (name, value, isGlobal) => {
   debug(name, index, value)
   t[name] = index
   src[index] = value
+  safeSrc[index] = safe
   re[index] = new RegExp(value, isGlobal ? 'g' : undefined)
   safeRe[index] = new RegExp(safe, isGlobal ? 'g' : undefined)
 }
@@ -60157,348 +61006,6 @@ createToken('STAR', '(<|>)?=?\\s*\\*')
 // >=0.0.0 is like a star
 createToken('GTE0', '^\\s*>=\\s*0\\.0\\.0\\s*$')
 createToken('GTE0PRE', '^\\s*>=\\s*0\\.0\\.0-0\\s*$')
-
-
-/***/ }),
-
-/***/ 81196:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-"use strict";
-
-
-// A linked list to keep track of recently-used-ness
-const Yallist = __nccwpck_require__(40665)
-
-const MAX = Symbol('max')
-const LENGTH = Symbol('length')
-const LENGTH_CALCULATOR = Symbol('lengthCalculator')
-const ALLOW_STALE = Symbol('allowStale')
-const MAX_AGE = Symbol('maxAge')
-const DISPOSE = Symbol('dispose')
-const NO_DISPOSE_ON_SET = Symbol('noDisposeOnSet')
-const LRU_LIST = Symbol('lruList')
-const CACHE = Symbol('cache')
-const UPDATE_AGE_ON_GET = Symbol('updateAgeOnGet')
-
-const naiveLength = () => 1
-
-// lruList is a yallist where the head is the youngest
-// item, and the tail is the oldest.  the list contains the Hit
-// objects as the entries.
-// Each Hit object has a reference to its Yallist.Node.  This
-// never changes.
-//
-// cache is a Map (or PseudoMap) that matches the keys to
-// the Yallist.Node object.
-class LRUCache {
-  constructor (options) {
-    if (typeof options === 'number')
-      options = { max: options }
-
-    if (!options)
-      options = {}
-
-    if (options.max && (typeof options.max !== 'number' || options.max < 0))
-      throw new TypeError('max must be a non-negative number')
-    // Kind of weird to have a default max of Infinity, but oh well.
-    const max = this[MAX] = options.max || Infinity
-
-    const lc = options.length || naiveLength
-    this[LENGTH_CALCULATOR] = (typeof lc !== 'function') ? naiveLength : lc
-    this[ALLOW_STALE] = options.stale || false
-    if (options.maxAge && typeof options.maxAge !== 'number')
-      throw new TypeError('maxAge must be a number')
-    this[MAX_AGE] = options.maxAge || 0
-    this[DISPOSE] = options.dispose
-    this[NO_DISPOSE_ON_SET] = options.noDisposeOnSet || false
-    this[UPDATE_AGE_ON_GET] = options.updateAgeOnGet || false
-    this.reset()
-  }
-
-  // resize the cache when the max changes.
-  set max (mL) {
-    if (typeof mL !== 'number' || mL < 0)
-      throw new TypeError('max must be a non-negative number')
-
-    this[MAX] = mL || Infinity
-    trim(this)
-  }
-  get max () {
-    return this[MAX]
-  }
-
-  set allowStale (allowStale) {
-    this[ALLOW_STALE] = !!allowStale
-  }
-  get allowStale () {
-    return this[ALLOW_STALE]
-  }
-
-  set maxAge (mA) {
-    if (typeof mA !== 'number')
-      throw new TypeError('maxAge must be a non-negative number')
-
-    this[MAX_AGE] = mA
-    trim(this)
-  }
-  get maxAge () {
-    return this[MAX_AGE]
-  }
-
-  // resize the cache when the lengthCalculator changes.
-  set lengthCalculator (lC) {
-    if (typeof lC !== 'function')
-      lC = naiveLength
-
-    if (lC !== this[LENGTH_CALCULATOR]) {
-      this[LENGTH_CALCULATOR] = lC
-      this[LENGTH] = 0
-      this[LRU_LIST].forEach(hit => {
-        hit.length = this[LENGTH_CALCULATOR](hit.value, hit.key)
-        this[LENGTH] += hit.length
-      })
-    }
-    trim(this)
-  }
-  get lengthCalculator () { return this[LENGTH_CALCULATOR] }
-
-  get length () { return this[LENGTH] }
-  get itemCount () { return this[LRU_LIST].length }
-
-  rforEach (fn, thisp) {
-    thisp = thisp || this
-    for (let walker = this[LRU_LIST].tail; walker !== null;) {
-      const prev = walker.prev
-      forEachStep(this, fn, walker, thisp)
-      walker = prev
-    }
-  }
-
-  forEach (fn, thisp) {
-    thisp = thisp || this
-    for (let walker = this[LRU_LIST].head; walker !== null;) {
-      const next = walker.next
-      forEachStep(this, fn, walker, thisp)
-      walker = next
-    }
-  }
-
-  keys () {
-    return this[LRU_LIST].toArray().map(k => k.key)
-  }
-
-  values () {
-    return this[LRU_LIST].toArray().map(k => k.value)
-  }
-
-  reset () {
-    if (this[DISPOSE] &&
-        this[LRU_LIST] &&
-        this[LRU_LIST].length) {
-      this[LRU_LIST].forEach(hit => this[DISPOSE](hit.key, hit.value))
-    }
-
-    this[CACHE] = new Map() // hash of items by key
-    this[LRU_LIST] = new Yallist() // list of items in order of use recency
-    this[LENGTH] = 0 // length of items in the list
-  }
-
-  dump () {
-    return this[LRU_LIST].map(hit =>
-      isStale(this, hit) ? false : {
-        k: hit.key,
-        v: hit.value,
-        e: hit.now + (hit.maxAge || 0)
-      }).toArray().filter(h => h)
-  }
-
-  dumpLru () {
-    return this[LRU_LIST]
-  }
-
-  set (key, value, maxAge) {
-    maxAge = maxAge || this[MAX_AGE]
-
-    if (maxAge && typeof maxAge !== 'number')
-      throw new TypeError('maxAge must be a number')
-
-    const now = maxAge ? Date.now() : 0
-    const len = this[LENGTH_CALCULATOR](value, key)
-
-    if (this[CACHE].has(key)) {
-      if (len > this[MAX]) {
-        del(this, this[CACHE].get(key))
-        return false
-      }
-
-      const node = this[CACHE].get(key)
-      const item = node.value
-
-      // dispose of the old one before overwriting
-      // split out into 2 ifs for better coverage tracking
-      if (this[DISPOSE]) {
-        if (!this[NO_DISPOSE_ON_SET])
-          this[DISPOSE](key, item.value)
-      }
-
-      item.now = now
-      item.maxAge = maxAge
-      item.value = value
-      this[LENGTH] += len - item.length
-      item.length = len
-      this.get(key)
-      trim(this)
-      return true
-    }
-
-    const hit = new Entry(key, value, len, now, maxAge)
-
-    // oversized objects fall out of cache automatically.
-    if (hit.length > this[MAX]) {
-      if (this[DISPOSE])
-        this[DISPOSE](key, value)
-
-      return false
-    }
-
-    this[LENGTH] += hit.length
-    this[LRU_LIST].unshift(hit)
-    this[CACHE].set(key, this[LRU_LIST].head)
-    trim(this)
-    return true
-  }
-
-  has (key) {
-    if (!this[CACHE].has(key)) return false
-    const hit = this[CACHE].get(key).value
-    return !isStale(this, hit)
-  }
-
-  get (key) {
-    return get(this, key, true)
-  }
-
-  peek (key) {
-    return get(this, key, false)
-  }
-
-  pop () {
-    const node = this[LRU_LIST].tail
-    if (!node)
-      return null
-
-    del(this, node)
-    return node.value
-  }
-
-  del (key) {
-    del(this, this[CACHE].get(key))
-  }
-
-  load (arr) {
-    // reset the cache
-    this.reset()
-
-    const now = Date.now()
-    // A previous serialized cache has the most recent items first
-    for (let l = arr.length - 1; l >= 0; l--) {
-      const hit = arr[l]
-      const expiresAt = hit.e || 0
-      if (expiresAt === 0)
-        // the item was created without expiration in a non aged cache
-        this.set(hit.k, hit.v)
-      else {
-        const maxAge = expiresAt - now
-        // dont add already expired items
-        if (maxAge > 0) {
-          this.set(hit.k, hit.v, maxAge)
-        }
-      }
-    }
-  }
-
-  prune () {
-    this[CACHE].forEach((value, key) => get(this, key, false))
-  }
-}
-
-const get = (self, key, doUse) => {
-  const node = self[CACHE].get(key)
-  if (node) {
-    const hit = node.value
-    if (isStale(self, hit)) {
-      del(self, node)
-      if (!self[ALLOW_STALE])
-        return undefined
-    } else {
-      if (doUse) {
-        if (self[UPDATE_AGE_ON_GET])
-          node.value.now = Date.now()
-        self[LRU_LIST].unshiftNode(node)
-      }
-    }
-    return hit.value
-  }
-}
-
-const isStale = (self, hit) => {
-  if (!hit || (!hit.maxAge && !self[MAX_AGE]))
-    return false
-
-  const diff = Date.now() - hit.now
-  return hit.maxAge ? diff > hit.maxAge
-    : self[MAX_AGE] && (diff > self[MAX_AGE])
-}
-
-const trim = self => {
-  if (self[LENGTH] > self[MAX]) {
-    for (let walker = self[LRU_LIST].tail;
-      self[LENGTH] > self[MAX] && walker !== null;) {
-      // We know that we're about to delete this one, and also
-      // what the next least recently used key will be, so just
-      // go ahead and set it now.
-      const prev = walker.prev
-      del(self, walker)
-      walker = prev
-    }
-  }
-}
-
-const del = (self, node) => {
-  if (node) {
-    const hit = node.value
-    if (self[DISPOSE])
-      self[DISPOSE](hit.key, hit.value)
-
-    self[LENGTH] -= hit.length
-    self[CACHE].delete(hit.key)
-    self[LRU_LIST].removeNode(node)
-  }
-}
-
-class Entry {
-  constructor (key, value, length, now, maxAge) {
-    this.key = key
-    this.value = value
-    this.length = length
-    this.now = now
-    this.maxAge = maxAge || 0
-  }
-}
-
-const forEachStep = (self, fn, node, thisp) => {
-  let hit = node.value
-  if (isStale(self, hit)) {
-    del(self, node)
-    if (!self[ALLOW_STALE])
-      hit = undefined
-  }
-  if (hit)
-    fn.call(thisp, hit.value, hit.key, self)
-}
-
-module.exports = LRUCache
 
 
 /***/ }),
@@ -67530,13 +68037,13 @@ const { EventEmitter } = __nccwpck_require__(82361)
 const STREAM_DESTROYED = new Error('Stream was destroyed')
 const PREMATURE_CLOSE = new Error('Premature close')
 
-const queueTick = __nccwpck_require__(5322)
 const FIFO = __nccwpck_require__(92958)
+const TextDecoder = __nccwpck_require__(21072)
 
 /* eslint-disable no-multi-spaces */
 
-// 28 bits used total (4 from shared, 14 from read, and 10 from write)
-const MAX = ((1 << 28) - 1)
+// 29 bits used total (4 from shared, 14 from read, and 11 from write)
+const MAX = ((1 << 29) - 1)
 
 // Shared state
 const OPENING       = 0b0001
@@ -67583,25 +68090,27 @@ const READ_NOT_UPDATING           = MAX ^ READ_UPDATING
 const READ_NO_READ_AHEAD          = MAX ^ READ_READ_AHEAD
 const READ_PAUSED_NO_READ_AHEAD   = MAX ^ READ_RESUMED_READ_AHEAD
 
-// Write state (18 bit offset, 4 bit offset from shared state and 13 from read state)
-const WRITE_ACTIVE     = 0b0000000001 << 18
-const WRITE_UPDATING   = 0b0000000010 << 18
-const WRITE_PRIMARY    = 0b0000000100 << 18
-const WRITE_QUEUED     = 0b0000001000 << 18
-const WRITE_UNDRAINED  = 0b0000010000 << 18
-const WRITE_DONE       = 0b0000100000 << 18
-const WRITE_EMIT_DRAIN = 0b0001000000 << 18
-const WRITE_NEXT_TICK  = 0b0010000000 << 18
-const WRITE_WRITING    = 0b0100000000 << 18
-const WRITE_FINISHING  = 0b1000000000 << 18
+// Write state (18 bit offset, 4 bit offset from shared state and 14 from read state)
+const WRITE_ACTIVE     = 0b00000000001 << 18
+const WRITE_UPDATING   = 0b00000000010 << 18
+const WRITE_PRIMARY    = 0b00000000100 << 18
+const WRITE_QUEUED     = 0b00000001000 << 18
+const WRITE_UNDRAINED  = 0b00000010000 << 18
+const WRITE_DONE       = 0b00000100000 << 18
+const WRITE_EMIT_DRAIN = 0b00001000000 << 18
+const WRITE_NEXT_TICK  = 0b00010000000 << 18
+const WRITE_WRITING    = 0b00100000000 << 18
+const WRITE_FINISHING  = 0b01000000000 << 18
+const WRITE_CORKED     = 0b10000000000 << 18
 
 const WRITE_NOT_ACTIVE    = MAX ^ (WRITE_ACTIVE | WRITE_WRITING)
 const WRITE_NON_PRIMARY   = MAX ^ WRITE_PRIMARY
-const WRITE_NOT_FINISHING = MAX ^ WRITE_FINISHING
+const WRITE_NOT_FINISHING = MAX ^ (WRITE_ACTIVE | WRITE_FINISHING)
 const WRITE_DRAINED       = MAX ^ WRITE_UNDRAINED
 const WRITE_NOT_QUEUED    = MAX ^ WRITE_QUEUED
 const WRITE_NOT_NEXT_TICK = MAX ^ WRITE_NEXT_TICK
 const WRITE_NOT_UPDATING  = MAX ^ WRITE_UPDATING
+const WRITE_NOT_CORKED    = MAX ^ WRITE_CORKED
 
 // Combined shared state
 const ACTIVE = READ_ACTIVE | WRITE_ACTIVE
@@ -67623,18 +68132,20 @@ const READ_READABLE_STATUS = OPEN_STATUS | READ_EMIT_READABLE | READ_QUEUED | RE
 const SHOULD_NOT_READ = OPEN_STATUS | READ_ACTIVE | READ_ENDING | READ_DONE | READ_NEEDS_PUSH | READ_READ_AHEAD
 const READ_BACKPRESSURE_STATUS = DESTROY_STATUS | READ_ENDING | READ_DONE
 const READ_UPDATE_SYNC_STATUS = READ_UPDATING | OPEN_STATUS | READ_NEXT_TICK | READ_PRIMARY
+const READ_NEXT_TICK_OR_OPENING = READ_NEXT_TICK | OPENING
 
 // Combined write state
 const WRITE_PRIMARY_STATUS = OPEN_STATUS | WRITE_FINISHING | WRITE_DONE
 const WRITE_QUEUED_AND_UNDRAINED = WRITE_QUEUED | WRITE_UNDRAINED
 const WRITE_QUEUED_AND_ACTIVE = WRITE_QUEUED | WRITE_ACTIVE
 const WRITE_DRAIN_STATUS = WRITE_QUEUED | WRITE_UNDRAINED | OPEN_STATUS | WRITE_ACTIVE
-const WRITE_STATUS = OPEN_STATUS | WRITE_ACTIVE | WRITE_QUEUED
+const WRITE_STATUS = OPEN_STATUS | WRITE_ACTIVE | WRITE_QUEUED | WRITE_CORKED
 const WRITE_PRIMARY_AND_ACTIVE = WRITE_PRIMARY | WRITE_ACTIVE
 const WRITE_ACTIVE_AND_WRITING = WRITE_ACTIVE | WRITE_WRITING
 const WRITE_FINISHING_STATUS = OPEN_STATUS | WRITE_FINISHING | WRITE_QUEUED_AND_ACTIVE | WRITE_DONE
 const WRITE_BACKPRESSURE_STATUS = WRITE_UNDRAINED | DESTROY_STATUS | WRITE_FINISHING | WRITE_DONE
 const WRITE_UPDATE_SYNC_STATUS = WRITE_UPDATING | OPEN_STATUS | WRITE_NEXT_TICK | WRITE_PRIMARY
+const WRITE_DROP_DATA = WRITE_FINISHING | WRITE_DONE | DESTROY_STATUS
 
 const asyncIterator = Symbol.asyncIterator || Symbol('asyncIterator')
 
@@ -67658,6 +68169,7 @@ class WritableState {
   }
 
   push (data) {
+    if ((this.stream._duplexState & WRITE_DROP_DATA) !== 0) return false
     if (this.map !== null) data = this.map(data)
 
     this.buffered += this.byteLength(data)
@@ -67722,7 +68234,7 @@ class WritableState {
     const stream = this.stream
 
     if ((stream._duplexState & WRITE_FINISHING_STATUS) === WRITE_FINISHING) {
-      stream._duplexState = (stream._duplexState | WRITE_ACTIVE) & WRITE_NOT_FINISHING
+      stream._duplexState = stream._duplexState | WRITE_ACTIVE
       stream._final(afterFinal.bind(this))
       return
     }
@@ -67755,7 +68267,7 @@ class WritableState {
   updateNextTick () {
     if ((this.stream._duplexState & WRITE_NEXT_TICK) !== 0) return
     this.stream._duplexState |= WRITE_NEXT_TICK
-    if ((this.stream._duplexState & WRITE_UPDATING) === 0) queueTick(this.afterUpdateNextTick)
+    if ((this.stream._duplexState & WRITE_UPDATING) === 0) queueMicrotask(this.afterUpdateNextTick)
   }
 }
 
@@ -67815,7 +68327,14 @@ class ReadableState {
       return false
     }
 
-    if (this.map !== null) data = this.map(data)
+    if (this.map !== null) {
+      data = this.map(data)
+      if (data === null) {
+        stream._duplexState &= READ_PUSHED
+        return this.buffered < this.highWaterMark
+      }
+    }
+
     this.buffered += this.byteLength(data)
     this.queue.push(data)
 
@@ -67933,10 +68452,16 @@ class ReadableState {
     else this.updateNextTick()
   }
 
+  updateNextTickIfOpen () {
+    if ((this.stream._duplexState & READ_NEXT_TICK_OR_OPENING) !== 0) return
+    this.stream._duplexState |= READ_NEXT_TICK
+    if ((this.stream._duplexState & READ_UPDATING) === 0) queueMicrotask(this.afterUpdateNextTick)
+  }
+
   updateNextTick () {
     if ((this.stream._duplexState & READ_NEXT_TICK) !== 0) return
     this.stream._duplexState |= READ_NEXT_TICK
-    if ((this.stream._duplexState & READ_UPDATING) === 0) queueTick(this.afterUpdateNextTick)
+    if ((this.stream._duplexState & READ_UPDATING) === 0) queueMicrotask(this.afterUpdateNextTick)
   }
 }
 
@@ -68007,7 +68532,7 @@ function afterFinal (err) {
     stream._duplexState |= DESTROYING
   }
 
-  stream._duplexState &= WRITE_NOT_ACTIVE
+  stream._duplexState &= WRITE_NOT_FINISHING
 
   // no need to wait the extra tick here, so we short circuit that
   if ((stream._duplexState & WRITE_UPDATING) === 0) this.update()
@@ -68212,6 +68737,19 @@ class Readable extends Stream {
       if (this._readableState.readAhead === false) this._duplexState &= READ_NO_READ_AHEAD
       if (opts.read) this._read = opts.read
       if (opts.eagerOpen) this._readableState.updateNextTick()
+      if (opts.encoding) this.setEncoding(opts.encoding)
+    }
+  }
+
+  setEncoding (encoding) {
+    const dec = new TextDecoder(encoding)
+    const map = this._readableState.map || echo
+    this._readableState.map = mapOrSkip
+    return this
+
+    function mapOrSkip (data) {
+      const next = dec.push(data)
+      return next === '' && (data.byteLength !== 0 || dec.remaining > 0) ? null : map(next)
     }
   }
 
@@ -68231,12 +68769,12 @@ class Readable extends Stream {
   }
 
   push (data) {
-    this._readableState.updateNextTick()
+    this._readableState.updateNextTickIfOpen()
     return this._readableState.push(data)
   }
 
   unshift (data) {
-    this._readableState.updateNextTick()
+    this._readableState.updateNextTickIfOpen()
     return this._readableState.unshift(data)
   }
 
@@ -68375,6 +68913,15 @@ class Writable extends Stream {
     }
   }
 
+  cork () {
+    this._duplexState |= WRITE_CORKED
+  }
+
+  uncork () {
+    this._duplexState &= WRITE_NOT_CORKED
+    this._writableState.updateNextTick()
+  }
+
   _writev (batch, cb) {
     cb(null)
   }
@@ -68427,6 +68974,15 @@ class Duplex extends Readable { // and Writable
       if (opts.write) this._write = opts.write
       if (opts.final) this._final = opts.final
     }
+  }
+
+  cork () {
+    this._duplexState |= WRITE_CORKED
+  }
+
+  uncork () {
+    this._duplexState &= WRITE_NOT_CORKED
+    this._writableState.updateNextTick()
   }
 
   _writev (batch, cb) {
@@ -68588,6 +69144,10 @@ function pipeline (stream, ...streams) {
   }
 }
 
+function echo (s) {
+  return s
+}
+
 function isStream (stream) {
   return !!stream._readableState || !!stream._writableState
 }
@@ -68596,13 +69156,27 @@ function isStreamx (stream) {
   return typeof stream._duplexState === 'number' && isStream(stream)
 }
 
-function getStreamError (stream) {
+function isEnded (stream) {
+  return !!stream._readableState && stream._readableState.ended
+}
+
+function isFinished (stream) {
+  return !!stream._writableState && stream._writableState.ended
+}
+
+function getStreamError (stream, opts = {}) {
   const err = (stream._readableState && stream._readableState.error) || (stream._writableState && stream._writableState.error)
-  return err === STREAM_DESTROYED ? null : err // only explicit errors
+
+  // avoid implicit errors by default
+  return (!opts.all && err === STREAM_DESTROYED) ? null : err
 }
 
 function isReadStreamx (stream) {
   return isStreamx(stream) && stream.readable
+}
+
+function isDisturbed (stream) {
+  return (stream._duplexState & OPENING) !== OPENING || (stream._duplexState & ACTIVE_OR_TICKING) !== 0
 }
 
 function isTypedArray (data) {
@@ -68628,6 +69202,9 @@ module.exports = {
   pipelinePromise,
   isStream,
   isStreamx,
+  isEnded,
+  isFinished,
+  isDisturbed,
   getStreamError,
   Stream,
   Writable,
@@ -68859,7 +69436,7 @@ const pump = __nccwpck_require__(18341)
 const fs = __nccwpck_require__(57147)
 const path = __nccwpck_require__(71017)
 
-const win32 = (global.Bare?.platform || process.platform) === 'win32'
+const win32 = (global.Bare ? global.Bare.platform : process.platform) === 'win32'
 
 exports.pack = function pack (cwd, opts) {
   if (!cwd) cwd = '.'
@@ -68900,6 +69477,7 @@ exports.pack = function pack (cwd, opts) {
   }
 
   function onstat (err, filename, stat) {
+    if (pack.destroyed) return
     if (err) return pack.destroy(err)
     if (!filename) {
       if (opts.finalize !== false) pack.finalize()
@@ -68964,16 +69542,18 @@ function head (list) {
 }
 
 function processGetuid () {
-  return process.getuid ? process.getuid() : -1
+  return (!global.Bare && process.getuid) ? process.getuid() : -1
 }
 
 function processUmask () {
-  return process.umask ? process.umask() : 0
+  return (!global.Bare && process.umask) ? process.umask() : 0
 }
 
 exports.extract = function extract (cwd, opts) {
   if (!cwd) cwd = '.'
   if (!opts) opts = {}
+
+  cwd = path.resolve(cwd)
 
   const xfs = opts.fs || fs
   const ignore = opts.ignore || opts.filter || noop
@@ -68984,6 +69564,7 @@ exports.extract = function extract (cwd, opts) {
   const now = new Date()
   const umask = typeof opts.umask === 'number' ? ~opts.umask : ~processUmask()
   const strict = opts.strict !== false
+  const validateSymLinks = opts.validateSymlinks !== false
 
   let map = opts.map || noop
   let dmode = typeof opts.dmode === 'number' ? opts.dmode : 0
@@ -69017,22 +69598,22 @@ exports.extract = function extract (cwd, opts) {
       return next()
     }
 
-    if (header.type === 'directory') {
-      stack.push([name, header.mtime])
-      return mkdirfix(name, {
-        fs: xfs,
-        own,
-        uid: header.uid,
-        gid: header.gid,
-        mode: header.mode
-      }, stat)
-    }
-
-    const dir = path.dirname(name)
+    const dir = path.join(name, '.') === path.join(cwd, '.') ? cwd : path.dirname(name)
 
     validate(xfs, dir, path.join(cwd, '.'), function (err, valid) {
       if (err) return next(err)
       if (!valid) return next(new Error(dir + ' is not a valid path'))
+
+      if (header.type === 'directory') {
+        stack.push([name, header.mtime])
+        return mkdirfix(name, {
+          fs: xfs,
+          own,
+          uid: header.uid,
+          gid: header.gid,
+          mode: header.mode
+        }, stat)
+      }
 
       mkdirfix(dir, {
         fs: xfs,
@@ -69071,6 +69652,9 @@ exports.extract = function extract (cwd, opts) {
     function onsymlink () {
       if (win32) return next() // skip symlinks on win for now before it can be tested
       xfs.unlink(name, function () {
+        const dst = path.resolve(path.dirname(name), header.linkname)
+        if (!inCwd(dst) && validateSymLinks) return next(new Error(name + ' is not a valid symlink'))
+
         xfs.symlink(header.linkname, name, stat)
       })
     }
@@ -69078,17 +69662,25 @@ exports.extract = function extract (cwd, opts) {
     function onlink () {
       if (win32) return next() // skip links on win for now before it can be tested
       xfs.unlink(name, function () {
-        const srcpath = path.join(cwd, path.join('/', header.linkname))
+        const link = path.join(cwd, path.join('/', header.linkname))
 
-        xfs.link(srcpath, name, function (err) {
-          if (err && err.code === 'EPERM' && opts.hardlinkAsFilesFallback) {
-            stream = xfs.createReadStream(srcpath)
-            return onfile()
-          }
+        fs.realpath(link, function (err, dst) {
+          if (err || !inCwd(dst)) return next(new Error(name + ' is not a valid hardlink'))
 
-          stat(err)
+          xfs.link(dst, name, function (err) {
+            if (err && err.code === 'EPERM' && opts.hardlinkAsFilesFallback) {
+              stream = xfs.createReadStream(dst)
+              return onfile()
+            }
+
+            stat(err)
+          })
         })
       })
+    }
+
+    function inCwd (dst) {
+      return dst === cwd || dst.startsWith(cwd + path.sep)
     }
 
     function onfile () {
@@ -69163,10 +69755,11 @@ exports.extract = function extract (cwd, opts) {
 
 function validate (fs, name, root, cb) {
   if (name === root) return cb(null, true)
+
   fs.lstat(name, function (err, st) {
-    if (err && err.code === 'ENOENT') return validate(fs, path.join(name, '..'), root, cb)
-    else if (err) return cb(err)
-    cb(null, st.isDirectory())
+    if (err && err.code !== 'ENOENT' && err.code !== 'EPERM') return cb(err)
+    if (err || st.isDirectory()) return validate(fs, path.join(name, '..'), root, cb)
+    cb(null, false)
   })
 }
 
@@ -70287,6 +70880,214 @@ function overflow (self, size) {
 
 function mapWritable (buf) {
   return b4a.isBuffer(buf) ? buf : b4a.from(buf)
+}
+
+
+/***/ }),
+
+/***/ 21072:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const PassThroughDecoder = __nccwpck_require__(96042)
+const UTF8Decoder = __nccwpck_require__(93197)
+
+module.exports = class TextDecoder {
+  constructor (encoding = 'utf8') {
+    this.encoding = normalizeEncoding(encoding)
+
+    switch (this.encoding) {
+      case 'utf8':
+        this.decoder = new UTF8Decoder()
+        break
+      case 'utf16le':
+      case 'base64':
+        throw new Error('Unsupported encoding: ' + this.encoding)
+      default:
+        this.decoder = new PassThroughDecoder(this.encoding)
+    }
+  }
+
+  get remaining () {
+    return this.decoder.remaining
+  }
+
+  push (data) {
+    if (typeof data === 'string') return data
+    return this.decoder.decode(data)
+  }
+
+  // For Node.js compatibility
+  write (data) {
+    return this.push(data)
+  }
+
+  end (data) {
+    let result = ''
+    if (data) result = this.push(data)
+    result += this.decoder.flush()
+    return result
+  }
+}
+
+function normalizeEncoding (encoding) {
+  encoding = encoding.toLowerCase()
+
+  switch (encoding) {
+    case 'utf8':
+    case 'utf-8':
+      return 'utf8'
+    case 'ucs2':
+    case 'ucs-2':
+    case 'utf16le':
+    case 'utf-16le':
+      return 'utf16le'
+    case 'latin1':
+    case 'binary':
+      return 'latin1'
+    case 'base64':
+    case 'ascii':
+    case 'hex':
+      return encoding
+    default:
+      throw new Error('Unknown encoding: ' + encoding)
+  }
+};
+
+
+/***/ }),
+
+/***/ 96042:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const b4a = __nccwpck_require__(33497)
+
+module.exports = class PassThroughDecoder {
+  constructor (encoding) {
+    this.encoding = encoding
+  }
+
+  get remaining () {
+    return 0
+  }
+
+  decode (tail) {
+    return b4a.toString(tail, this.encoding)
+  }
+
+  flush () {
+    return ''
+  }
+}
+
+
+/***/ }),
+
+/***/ 93197:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+
+const b4a = __nccwpck_require__(33497)
+
+/**
+ * https://encoding.spec.whatwg.org/#utf-8-decoder
+ */
+module.exports = class UTF8Decoder {
+  constructor () {
+    this.codePoint = 0
+    this.bytesSeen = 0
+    this.bytesNeeded = 0
+    this.lowerBoundary = 0x80
+    this.upperBoundary = 0xbf
+  }
+
+  get remaining () {
+    return this.bytesSeen
+  }
+
+  decode (data) {
+    // If we have a fast path, just sniff if the last part is a boundary
+    if (this.bytesNeeded === 0) {
+      let isBoundary = true
+
+      for (let i = Math.max(0, data.byteLength - 4), n = data.byteLength; i < n && isBoundary; i++) {
+        isBoundary = data[i] <= 0x7f
+      }
+
+      if (isBoundary) return b4a.toString(data, 'utf8')
+    }
+
+    let result = ''
+
+    for (let i = 0, n = data.byteLength; i < n; i++) {
+      const byte = data[i]
+
+      if (this.bytesNeeded === 0) {
+        if (byte <= 0x7f) {
+          result += String.fromCharCode(byte)
+        } else {
+          this.bytesSeen = 1
+
+          if (byte >= 0xc2 && byte <= 0xdf) {
+            this.bytesNeeded = 2
+            this.codePoint = byte & 0x1f
+          } else if (byte >= 0xe0 && byte <= 0xef) {
+            if (byte === 0xe0) this.lowerBoundary = 0xa0
+            else if (byte === 0xed) this.upperBoundary = 0x9f
+            this.bytesNeeded = 3
+            this.codePoint = byte & 0xf
+          } else if (byte >= 0xf0 && byte <= 0xf4) {
+            if (byte === 0xf0) this.lowerBoundary = 0x90
+            if (byte === 0xf4) this.upperBoundary = 0x8f
+            this.bytesNeeded = 4
+            this.codePoint = byte & 0x7
+          } else {
+            result += '\ufffd'
+          }
+        }
+
+        continue
+      }
+
+      if (byte < this.lowerBoundary || byte > this.upperBoundary) {
+        this.codePoint = 0
+        this.bytesNeeded = 0
+        this.bytesSeen = 0
+        this.lowerBoundary = 0x80
+        this.upperBoundary = 0xbf
+
+        result += '\ufffd'
+
+        continue
+      }
+
+      this.lowerBoundary = 0x80
+      this.upperBoundary = 0xbf
+
+      this.codePoint = (this.codePoint << 6) | (byte & 0x3f)
+      this.bytesSeen++
+
+      if (this.bytesSeen !== this.bytesNeeded) continue
+
+      result += String.fromCodePoint(this.codePoint)
+
+      this.codePoint = 0
+      this.bytesNeeded = 0
+      this.bytesSeen = 0
+    }
+
+    return result
+  }
+
+  flush () {
+    const result = this.bytesNeeded > 0 ? '\ufffd' : ''
+
+    this.codePoint = 0
+    this.bytesNeeded = 0
+    this.bytesSeen = 0
+    this.lowerBoundary = 0x80
+    this.upperBoundary = 0xbf
+
+    return result
+  }
 }
 
 
@@ -76961,7 +77762,7 @@ module.exports = {
 
 
 const { parseSetCookie } = __nccwpck_require__(24408)
-const { stringify, getHeadersList } = __nccwpck_require__(43121)
+const { stringify } = __nccwpck_require__(43121)
 const { webidl } = __nccwpck_require__(21744)
 const { Headers } = __nccwpck_require__(10554)
 
@@ -77037,14 +77838,13 @@ function getSetCookies (headers) {
 
   webidl.brandCheck(headers, Headers, { strict: false })
 
-  const cookies = getHeadersList(headers).cookies
+  const cookies = headers.getSetCookie()
 
   if (!cookies) {
     return []
   }
 
-  // In older versions of undici, cookies is a list of name:value.
-  return cookies.map((pair) => parseSetCookie(Array.isArray(pair) ? pair[1] : pair))
+  return cookies.map((pair) => parseSetCookie(pair))
 }
 
 /**
@@ -77472,14 +78272,15 @@ module.exports = {
 /***/ }),
 
 /***/ 43121:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
+/***/ ((module) => {
 
 "use strict";
 
 
-const assert = __nccwpck_require__(39491)
-const { kHeadersList } = __nccwpck_require__(72785)
-
+/**
+ * @param {string} value
+ * @returns {boolean}
+ */
 function isCTLExcludingHtab (value) {
   if (value.length === 0) {
     return false
@@ -77740,31 +78541,13 @@ function stringify (cookie) {
   return out.join('; ')
 }
 
-let kHeadersListNode
-
-function getHeadersList (headers) {
-  if (headers[kHeadersList]) {
-    return headers[kHeadersList]
-  }
-
-  if (!kHeadersListNode) {
-    kHeadersListNode = Object.getOwnPropertySymbols(headers).find(
-      (symbol) => symbol.description === 'headers list'
-    )
-
-    assert(kHeadersListNode, 'Headers cannot be parsed')
-  }
-
-  const headersList = headers[kHeadersListNode]
-  assert(headersList)
-
-  return headersList
-}
-
 module.exports = {
   isCTLExcludingHtab,
-  stringify,
-  getHeadersList
+  validateCookieName,
+  validateCookiePath,
+  validateCookieValue,
+  toIMFDate,
+  stringify
 }
 
 
@@ -79693,6 +80476,14 @@ const { isUint8Array, isArrayBuffer } = __nccwpck_require__(29830)
 const { File: UndiciFile } = __nccwpck_require__(78511)
 const { parseMIMEType, serializeAMimeType } = __nccwpck_require__(685)
 
+let random
+try {
+  const crypto = __nccwpck_require__(6005)
+  random = (max) => crypto.randomInt(0, max)
+} catch {
+  random = (max) => Math.floor(Math.random(max))
+}
+
 let ReadableStream = globalThis.ReadableStream
 
 /** @type {globalThis['File']} */
@@ -79778,7 +80569,7 @@ function extractBody (object, keepalive = false) {
     // Set source to a copy of the bytes held by object.
     source = new Uint8Array(object.buffer.slice(object.byteOffset, object.byteOffset + object.byteLength))
   } else if (util.isFormDataLike(object)) {
-    const boundary = `----formdata-undici-0${`${Math.floor(Math.random() * 1e11)}`.padStart(11, '0')}`
+    const boundary = `----formdata-undici-0${`${random(1e11)}`.padStart(11, '0')}`
     const prefix = `--${boundary}\r\nContent-Disposition: form-data`
 
     /*! formdata-polyfill. MIT License. Jimmy Wärting <https://jimmy.warting.se/opensource> */
@@ -81760,6 +82551,7 @@ const {
   isValidHeaderName,
   isValidHeaderValue
 } = __nccwpck_require__(52538)
+const util = __nccwpck_require__(73837)
 const { webidl } = __nccwpck_require__(21744)
 const assert = __nccwpck_require__(39491)
 
@@ -82313,6 +83105,9 @@ Object.defineProperties(Headers.prototype, {
   [Symbol.toStringTag]: {
     value: 'Headers',
     configurable: true
+  },
+  [util.inspect.custom]: {
+    enumerable: false
   }
 })
 
@@ -91489,6 +92284,20 @@ class Pool extends PoolBase {
       ? { ...options.interceptors }
       : undefined
     this[kFactory] = factory
+
+    this.on('connectionError', (origin, targets, error) => {
+      // If a connection error occurs, we remove the client from the pool,
+      // and emit a connectionError event. They will not be re-used.
+      // Fixes https://github.com/nodejs/undici/issues/3895
+      for (const target of targets) {
+        // Do not use kRemoveClient here, as it will close the client,
+        // but the client cannot be closed in this state.
+        const idx = this[kClients].indexOf(target)
+        if (idx !== -1) {
+          this[kClients].splice(idx, 1)
+        }
+      }
+    })
   }
 
   [kGetDispatcher] () {
@@ -94927,10 +95736,16 @@ if (!process.env.WS_NO_BUFFER_UTIL) {
 "use strict";
 
 
+const BINARY_TYPES = ['nodebuffer', 'arraybuffer', 'fragments'];
+const hasBlob = typeof Blob !== 'undefined';
+
+if (hasBlob) BINARY_TYPES.push('blob');
+
 module.exports = {
-  BINARY_TYPES: ['nodebuffer', 'arraybuffer', 'fragments'],
+  BINARY_TYPES,
   EMPTY_BUFFER: Buffer.alloc(0),
   GUID: '258EAFA5-E914-47DA-95CA-C5AB0DC85B11',
+  hasBlob,
   kForOnEventAttribute: Symbol('kIsForOnEventAttribute'),
   kListener: Symbol('kListener'),
   kStatusCode: Symbol('status-code'),
@@ -96056,13 +96871,6 @@ const { concat, toArrayBuffer, unmask } = __nccwpck_require__(9436);
 const { isValidStatusCode, isValidUTF8 } = __nccwpck_require__(86279);
 
 const FastBuffer = Buffer[Symbol.species];
-const promise = Promise.resolve();
-
-//
-// `queueMicrotask()` is not available in Node.js < 11.
-//
-const queueTask =
-  typeof queueMicrotask === 'function' ? queueMicrotask : queueMicrotaskShim;
 
 const GET_INFO = 0;
 const GET_PAYLOAD_LENGTH_16 = 1;
@@ -96082,7 +96890,7 @@ class Receiver extends Writable {
    * Creates a Receiver instance.
    *
    * @param {Object} [options] Options object
-   * @param {Boolean} [options.allowSynchronousEvents=false] Specifies whether
+   * @param {Boolean} [options.allowSynchronousEvents=true] Specifies whether
    *     any of the `'message'`, `'ping'`, and `'pong'` events can be emitted
    *     multiple times in the same tick
    * @param {String} [options.binaryType=nodebuffer] The type for binary data
@@ -96097,7 +96905,10 @@ class Receiver extends Writable {
   constructor(options = {}) {
     super();
 
-    this._allowSynchronousEvents = !!options.allowSynchronousEvents;
+    this._allowSynchronousEvents =
+      options.allowSynchronousEvents !== undefined
+        ? options.allowSynchronousEvents
+        : true;
     this._binaryType = options.binaryType || BINARY_TYPES[0];
     this._extensions = options.extensions || {};
     this._isServer = !!options.isServer;
@@ -96606,21 +97417,18 @@ class Receiver extends Writable {
         data = concat(fragments, messageLength);
       } else if (this._binaryType === 'arraybuffer') {
         data = toArrayBuffer(concat(fragments, messageLength));
+      } else if (this._binaryType === 'blob') {
+        data = new Blob(fragments);
       } else {
         data = fragments;
       }
 
-      //
-      // If the state is `INFLATING`, it means that the frame data was
-      // decompressed asynchronously, so there is no need to defer the event
-      // as it will be emitted asynchronously anyway.
-      //
-      if (this._state === INFLATING || this._allowSynchronousEvents) {
+      if (this._allowSynchronousEvents) {
         this.emit('message', data, true);
         this._state = GET_INFO;
       } else {
         this._state = DEFER_EVENT;
-        queueTask(() => {
+        setImmediate(() => {
           this.emit('message', data, true);
           this._state = GET_INFO;
           this.startLoop(cb);
@@ -96647,7 +97455,7 @@ class Receiver extends Writable {
         this._state = GET_INFO;
       } else {
         this._state = DEFER_EVENT;
-        queueTask(() => {
+        setImmediate(() => {
           this.emit('message', buf, false);
           this._state = GET_INFO;
           this.startLoop(cb);
@@ -96718,7 +97526,7 @@ class Receiver extends Writable {
       this._state = GET_INFO;
     } else {
       this._state = DEFER_EVENT;
-      queueTask(() => {
+      setImmediate(() => {
         this.emit(this._opcode === 0x09 ? 'ping' : 'pong', data);
         this._state = GET_INFO;
         this.startLoop(cb);
@@ -96755,35 +97563,6 @@ class Receiver extends Writable {
 
 module.exports = Receiver;
 
-/**
- * A shim for `queueMicrotask()`.
- *
- * @param {Function} cb Callback
- */
-function queueMicrotaskShim(cb) {
-  promise.then(cb).catch(throwErrorNextTick);
-}
-
-/**
- * Throws an error.
- *
- * @param {Error} err The error to throw
- * @private
- */
-function throwError(err) {
-  throw err;
-}
-
-/**
- * Throws an error in the next tick.
- *
- * @param {Error} err The error to throw
- * @private
- */
-function throwErrorNextTick(err) {
-  process.nextTick(throwError, err);
-}
-
 
 /***/ }),
 
@@ -96799,12 +97578,19 @@ const { Duplex } = __nccwpck_require__(12781);
 const { randomFillSync } = __nccwpck_require__(6113);
 
 const PerMessageDeflate = __nccwpck_require__(56684);
-const { EMPTY_BUFFER } = __nccwpck_require__(15949);
-const { isValidStatusCode } = __nccwpck_require__(86279);
+const { EMPTY_BUFFER, kWebSocket, NOOP } = __nccwpck_require__(15949);
+const { isBlob, isValidStatusCode } = __nccwpck_require__(86279);
 const { mask: applyMask, toBuffer } = __nccwpck_require__(9436);
 
 const kByteLength = Symbol('kByteLength');
 const maskBuffer = Buffer.alloc(4);
+const RANDOM_POOL_SIZE = 8 * 1024;
+let randomPool;
+let randomPoolPointer = RANDOM_POOL_SIZE;
+
+const DEFAULT = 0;
+const DEFLATING = 1;
+const GET_BLOB_DATA = 2;
 
 /**
  * HyBi Sender implementation.
@@ -96832,8 +97618,10 @@ class Sender {
     this._compress = false;
 
     this._bufferedBytes = 0;
-    this._deflating = false;
     this._queue = [];
+    this._state = DEFAULT;
+    this.onerror = NOOP;
+    this[kWebSocket] = undefined;
   }
 
   /**
@@ -96869,7 +97657,24 @@ class Sender {
       if (options.generateMask) {
         options.generateMask(mask);
       } else {
-        randomFillSync(mask, 0, 4);
+        if (randomPoolPointer === RANDOM_POOL_SIZE) {
+          /* istanbul ignore else  */
+          if (randomPool === undefined) {
+            //
+            // This is lazily initialized because server-sent frames must not
+            // be masked so it may never be used.
+            //
+            randomPool = Buffer.alloc(RANDOM_POOL_SIZE);
+          }
+
+          randomFillSync(randomPool, 0, RANDOM_POOL_SIZE);
+          randomPoolPointer = 0;
+        }
+
+        mask[0] = randomPool[randomPoolPointer++];
+        mask[1] = randomPool[randomPoolPointer++];
+        mask[2] = randomPool[randomPoolPointer++];
+        mask[3] = randomPool[randomPoolPointer++];
       }
 
       skipMasking = (mask[0] | mask[1] | mask[2] | mask[3]) === 0;
@@ -96983,7 +97788,7 @@ class Sender {
       rsv1: false
     };
 
-    if (this._deflating) {
+    if (this._state !== DEFAULT) {
       this.enqueue([this.dispatch, buf, false, options, cb]);
     } else {
       this.sendFrame(Sender.frame(buf, options), cb);
@@ -97004,6 +97809,9 @@ class Sender {
 
     if (typeof data === 'string') {
       byteLength = Buffer.byteLength(data);
+      readOnly = false;
+    } else if (isBlob(data)) {
+      byteLength = data.size;
       readOnly = false;
     } else {
       data = toBuffer(data);
@@ -97026,7 +97834,13 @@ class Sender {
       rsv1: false
     };
 
-    if (this._deflating) {
+    if (isBlob(data)) {
+      if (this._state !== DEFAULT) {
+        this.enqueue([this.getBlobData, data, false, options, cb]);
+      } else {
+        this.getBlobData(data, false, options, cb);
+      }
+    } else if (this._state !== DEFAULT) {
       this.enqueue([this.dispatch, data, false, options, cb]);
     } else {
       this.sendFrame(Sender.frame(data, options), cb);
@@ -97047,6 +97861,9 @@ class Sender {
 
     if (typeof data === 'string') {
       byteLength = Buffer.byteLength(data);
+      readOnly = false;
+    } else if (isBlob(data)) {
+      byteLength = data.size;
       readOnly = false;
     } else {
       data = toBuffer(data);
@@ -97069,7 +97886,13 @@ class Sender {
       rsv1: false
     };
 
-    if (this._deflating) {
+    if (isBlob(data)) {
+      if (this._state !== DEFAULT) {
+        this.enqueue([this.getBlobData, data, false, options, cb]);
+      } else {
+        this.getBlobData(data, false, options, cb);
+      }
+    } else if (this._state !== DEFAULT) {
       this.enqueue([this.dispatch, data, false, options, cb]);
     } else {
       this.sendFrame(Sender.frame(data, options), cb);
@@ -97103,6 +97926,9 @@ class Sender {
     if (typeof data === 'string') {
       byteLength = Buffer.byteLength(data);
       readOnly = false;
+    } else if (isBlob(data)) {
+      byteLength = data.size;
+      readOnly = false;
     } else {
       data = toBuffer(data);
       byteLength = data.length;
@@ -97130,38 +97956,92 @@ class Sender {
 
     if (options.fin) this._firstFragment = true;
 
-    if (perMessageDeflate) {
-      const opts = {
-        [kByteLength]: byteLength,
-        fin: options.fin,
-        generateMask: this._generateMask,
-        mask: options.mask,
-        maskBuffer: this._maskBuffer,
-        opcode,
-        readOnly,
-        rsv1
-      };
+    const opts = {
+      [kByteLength]: byteLength,
+      fin: options.fin,
+      generateMask: this._generateMask,
+      mask: options.mask,
+      maskBuffer: this._maskBuffer,
+      opcode,
+      readOnly,
+      rsv1
+    };
 
-      if (this._deflating) {
-        this.enqueue([this.dispatch, data, this._compress, opts, cb]);
+    if (isBlob(data)) {
+      if (this._state !== DEFAULT) {
+        this.enqueue([this.getBlobData, data, this._compress, opts, cb]);
       } else {
-        this.dispatch(data, this._compress, opts, cb);
+        this.getBlobData(data, this._compress, opts, cb);
       }
+    } else if (this._state !== DEFAULT) {
+      this.enqueue([this.dispatch, data, this._compress, opts, cb]);
     } else {
-      this.sendFrame(
-        Sender.frame(data, {
-          [kByteLength]: byteLength,
-          fin: options.fin,
-          generateMask: this._generateMask,
-          mask: options.mask,
-          maskBuffer: this._maskBuffer,
-          opcode,
-          readOnly,
-          rsv1: false
-        }),
-        cb
-      );
+      this.dispatch(data, this._compress, opts, cb);
     }
+  }
+
+  /**
+   * Gets the contents of a blob as binary data.
+   *
+   * @param {Blob} blob The blob
+   * @param {Boolean} [compress=false] Specifies whether or not to compress
+   *     the data
+   * @param {Object} options Options object
+   * @param {Boolean} [options.fin=false] Specifies whether or not to set the
+   *     FIN bit
+   * @param {Function} [options.generateMask] The function used to generate the
+   *     masking key
+   * @param {Boolean} [options.mask=false] Specifies whether or not to mask
+   *     `data`
+   * @param {Buffer} [options.maskBuffer] The buffer used to store the masking
+   *     key
+   * @param {Number} options.opcode The opcode
+   * @param {Boolean} [options.readOnly=false] Specifies whether `data` can be
+   *     modified
+   * @param {Boolean} [options.rsv1=false] Specifies whether or not to set the
+   *     RSV1 bit
+   * @param {Function} [cb] Callback
+   * @private
+   */
+  getBlobData(blob, compress, options, cb) {
+    this._bufferedBytes += options[kByteLength];
+    this._state = GET_BLOB_DATA;
+
+    blob
+      .arrayBuffer()
+      .then((arrayBuffer) => {
+        if (this._socket.destroyed) {
+          const err = new Error(
+            'The socket was closed while the blob was being read'
+          );
+
+          //
+          // `callCallbacks` is called in the next tick to ensure that errors
+          // that might be thrown in the callbacks behave like errors thrown
+          // outside the promise chain.
+          //
+          process.nextTick(callCallbacks, this, err, cb);
+          return;
+        }
+
+        this._bufferedBytes -= options[kByteLength];
+        const data = toBuffer(arrayBuffer);
+
+        if (!compress) {
+          this._state = DEFAULT;
+          this.sendFrame(Sender.frame(data, options), cb);
+          this.dequeue();
+        } else {
+          this.dispatch(data, compress, options, cb);
+        }
+      })
+      .catch((err) => {
+        //
+        // `onError` is called in the next tick for the same reason that
+        // `callCallbacks` above is.
+        //
+        process.nextTick(onError, this, err, cb);
+      });
   }
 
   /**
@@ -97196,27 +98076,19 @@ class Sender {
     const perMessageDeflate = this._extensions[PerMessageDeflate.extensionName];
 
     this._bufferedBytes += options[kByteLength];
-    this._deflating = true;
+    this._state = DEFLATING;
     perMessageDeflate.compress(data, options.fin, (_, buf) => {
       if (this._socket.destroyed) {
         const err = new Error(
           'The socket was closed while data was being compressed'
         );
 
-        if (typeof cb === 'function') cb(err);
-
-        for (let i = 0; i < this._queue.length; i++) {
-          const params = this._queue[i];
-          const callback = params[params.length - 1];
-
-          if (typeof callback === 'function') callback(err);
-        }
-
+        callCallbacks(this, err, cb);
         return;
       }
 
       this._bufferedBytes -= options[kByteLength];
-      this._deflating = false;
+      this._state = DEFAULT;
       options.readOnly = false;
       this.sendFrame(Sender.frame(buf, options), cb);
       this.dequeue();
@@ -97229,7 +98101,7 @@ class Sender {
    * @private
    */
   dequeue() {
-    while (!this._deflating && this._queue.length) {
+    while (this._state === DEFAULT && this._queue.length) {
       const params = this._queue.shift();
 
       this._bufferedBytes -= params[3][kByteLength];
@@ -97251,7 +98123,7 @@ class Sender {
   /**
    * Sends a frame.
    *
-   * @param {Buffer[]} list The frame to send
+   * @param {(Buffer | String)[]} list The frame to send
    * @param {Function} [cb] Callback
    * @private
    */
@@ -97269,6 +98141,38 @@ class Sender {
 
 module.exports = Sender;
 
+/**
+ * Calls queued callbacks with an error.
+ *
+ * @param {Sender} sender The `Sender` instance
+ * @param {Error} err The error to call the callbacks with
+ * @param {Function} [cb] The first callback
+ * @private
+ */
+function callCallbacks(sender, err, cb) {
+  if (typeof cb === 'function') cb(err);
+
+  for (let i = 0; i < sender._queue.length; i++) {
+    const params = sender._queue[i];
+    const callback = params[params.length - 1];
+
+    if (typeof callback === 'function') callback(err);
+  }
+}
+
+/**
+ * Handles a `Sender` error.
+ *
+ * @param {Sender} sender The `Sender` instance
+ * @param {Error} err The error
+ * @param {Function} [cb] The first pending callback
+ * @private
+ */
+function onError(sender, err, cb) {
+  callCallbacks(sender, err, cb);
+  sender.onerror(err);
+}
+
 
 /***/ }),
 
@@ -97276,8 +98180,10 @@ module.exports = Sender;
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
+/* eslint no-unused-vars: ["error", { "varsIgnorePattern": "^WebSocket$" }] */
 
 
+const WebSocket = __nccwpck_require__(91518);
 const { Duplex } = __nccwpck_require__(12781);
 
 /**
@@ -97517,6 +98423,8 @@ module.exports = { parse };
 
 const { isUtf8 } = __nccwpck_require__(14300);
 
+const { hasBlob } = __nccwpck_require__(15949);
+
 //
 // Allowed token characters:
 //
@@ -97622,7 +98530,27 @@ function _isValidUTF8(buf) {
   return true;
 }
 
+/**
+ * Determines whether a value is a `Blob`.
+ *
+ * @param {*} value The value to be tested
+ * @return {Boolean} `true` if `value` is a `Blob`, else `false`
+ * @private
+ */
+function isBlob(value) {
+  return (
+    hasBlob &&
+    typeof value === 'object' &&
+    typeof value.arrayBuffer === 'function' &&
+    typeof value.type === 'string' &&
+    typeof value.stream === 'function' &&
+    (value[Symbol.toStringTag] === 'Blob' ||
+      value[Symbol.toStringTag] === 'File')
+  );
+}
+
 module.exports = {
+  isBlob,
   isValidStatusCode,
   isValidUTF8: _isValidUTF8,
   tokenChars
@@ -97651,7 +98579,7 @@ if (isUtf8) {
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
-/* eslint no-unused-vars: ["error", { "varsIgnorePattern": "^Duplex$" }] */
+/* eslint no-unused-vars: ["error", { "varsIgnorePattern": "^Duplex$", "caughtErrors": "none" }] */
 
 
 
@@ -97682,7 +98610,7 @@ class WebSocketServer extends EventEmitter {
    * Create a `WebSocketServer` instance.
    *
    * @param {Object} options Configuration options
-   * @param {Boolean} [options.allowSynchronousEvents=false] Specifies whether
+   * @param {Boolean} [options.allowSynchronousEvents=true] Specifies whether
    *     any of the `'message'`, `'ping'`, and `'pong'` events can be emitted
    *     multiple times in the same tick
    * @param {Boolean} [options.autoPong=true] Specifies whether or not to
@@ -97713,7 +98641,7 @@ class WebSocketServer extends EventEmitter {
     super();
 
     options = {
-      allowSynchronousEvents: false,
+      allowSynchronousEvents: true,
       autoPong: true,
       maxPayload: 100 * 1024 * 1024,
       skipUTF8Validation: false,
@@ -97888,6 +98816,7 @@ class WebSocketServer extends EventEmitter {
     socket.on('error', socketOnError);
 
     const key = req.headers['sec-websocket-key'];
+    const upgrade = req.headers.upgrade;
     const version = +req.headers['sec-websocket-version'];
 
     if (req.method !== 'GET') {
@@ -97896,13 +98825,13 @@ class WebSocketServer extends EventEmitter {
       return;
     }
 
-    if (req.headers.upgrade.toLowerCase() !== 'websocket') {
+    if (upgrade === undefined || upgrade.toLowerCase() !== 'websocket') {
       const message = 'Invalid Upgrade header';
       abortHandshakeOrEmitwsClientError(this, req, socket, 400, message);
       return;
     }
 
-    if (!key || !keyRegex.test(key)) {
+    if (key === undefined || !keyRegex.test(key)) {
       const message = 'Missing or invalid Sec-WebSocket-Key header';
       abortHandshakeOrEmitwsClientError(this, req, socket, 400, message);
       return;
@@ -98198,7 +99127,7 @@ function abortHandshakeOrEmitwsClientError(server, req, socket, code, message) {
 /***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
 "use strict";
-/* eslint no-unused-vars: ["error", { "varsIgnorePattern": "^Duplex|Readable$" }] */
+/* eslint no-unused-vars: ["error", { "varsIgnorePattern": "^Duplex|Readable$", "caughtErrors": "none" }] */
 
 
 
@@ -98214,6 +99143,8 @@ const { URL } = __nccwpck_require__(57310);
 const PerMessageDeflate = __nccwpck_require__(56684);
 const Receiver = __nccwpck_require__(25066);
 const Sender = __nccwpck_require__(36947);
+const { isBlob } = __nccwpck_require__(86279);
+
 const {
   BINARY_TYPES,
   EMPTY_BUFFER,
@@ -98258,6 +99189,7 @@ class WebSocket extends EventEmitter {
     this._closeFrameSent = false;
     this._closeMessage = EMPTY_BUFFER;
     this._closeTimer = null;
+    this._errorEmitted = false;
     this._extensions = {};
     this._paused = false;
     this._protocol = '';
@@ -98290,9 +99222,8 @@ class WebSocket extends EventEmitter {
   }
 
   /**
-   * This deviates from the WHATWG interface since ws doesn't support the
-   * required default "blob" type (instead we define a custom "nodebuffer"
-   * type).
+   * For historical reasons, the custom "nodebuffer" type is used by the default
+   * instead of "blob".
    *
    * @type {String}
    */
@@ -98413,11 +99344,14 @@ class WebSocket extends EventEmitter {
       skipUTF8Validation: options.skipUTF8Validation
     });
 
-    this._sender = new Sender(socket, this._extensions, options.generateMask);
+    const sender = new Sender(socket, this._extensions, options.generateMask);
+
     this._receiver = receiver;
+    this._sender = sender;
     this._socket = socket;
 
     receiver[kWebSocket] = this;
+    sender[kWebSocket] = this;
     socket[kWebSocket] = this;
 
     receiver.on('conclude', receiverOnConclude);
@@ -98426,6 +99360,8 @@ class WebSocket extends EventEmitter {
     receiver.on('message', receiverOnMessage);
     receiver.on('ping', receiverOnPing);
     receiver.on('pong', receiverOnPong);
+
+    sender.onerror = senderOnError;
 
     //
     // These methods may not be available if `socket` is just a `Duplex`.
@@ -98522,13 +99458,7 @@ class WebSocket extends EventEmitter {
       }
     });
 
-    //
-    // Specify a timeout for the closing handshake to complete.
-    //
-    this._closeTimer = setTimeout(
-      this._socket.destroy.bind(this._socket),
-      closeTimeout
-    );
+    setCloseTimer(this);
   }
 
   /**
@@ -98823,7 +99753,7 @@ module.exports = WebSocket;
  * @param {(String|URL)} address The URL to which to connect
  * @param {Array} protocols The subprotocols
  * @param {Object} [options] Connection options
- * @param {Boolean} [options.allowSynchronousEvents=false] Specifies whether any
+ * @param {Boolean} [options.allowSynchronousEvents=true] Specifies whether any
  *     of the `'message'`, `'ping'`, and `'pong'` events can be emitted multiple
  *     times in the same tick
  * @param {Boolean} [options.autoPong=true] Specifies whether or not to
@@ -98852,7 +99782,7 @@ module.exports = WebSocket;
  */
 function initAsClient(websocket, address, protocols, options) {
   const opts = {
-    allowSynchronousEvents: false,
+    allowSynchronousEvents: true,
     autoPong: true,
     protocolVersion: protocolVersions[1],
     maxPayload: 100 * 1024 * 1024,
@@ -98861,7 +99791,6 @@ function initAsClient(websocket, address, protocols, options) {
     followRedirects: false,
     maxRedirects: 10,
     ...options,
-    createConnection: undefined,
     socketPath: undefined,
     hostname: undefined,
     protocol: undefined,
@@ -98932,7 +99861,8 @@ function initAsClient(websocket, address, protocols, options) {
   const protocolSet = new Set();
   let perMessageDeflate;
 
-  opts.createConnection = isSecure ? tlsConnect : netConnect;
+  opts.createConnection =
+    opts.createConnection || (isSecure ? tlsConnect : netConnect);
   opts.defaultPort = opts.defaultPort || defaultPort;
   opts.port = parsedUrl.port || defaultPort;
   opts.host = parsedUrl.hostname.startsWith('[')
@@ -99128,7 +100058,9 @@ function initAsClient(websocket, address, protocols, options) {
 
     req = websocket._req = null;
 
-    if (res.headers.upgrade.toLowerCase() !== 'websocket') {
+    const upgrade = res.headers.upgrade;
+
+    if (upgrade === undefined || upgrade.toLowerCase() !== 'websocket') {
       abortHandshake(websocket, socket, 'Invalid Upgrade header');
       return;
     }
@@ -99230,6 +100162,11 @@ function initAsClient(websocket, address, protocols, options) {
  */
 function emitErrorAndClose(websocket, err) {
   websocket._readyState = WebSocket.CLOSING;
+  //
+  // The following assignment is practically useless and is done only for
+  // consistency.
+  //
+  websocket._errorEmitted = true;
   websocket.emit('error', err);
   websocket.emitClose();
 }
@@ -99310,7 +100247,7 @@ function abortHandshake(websocket, stream, message) {
  */
 function sendAfterClose(websocket, data, cb) {
   if (data) {
-    const length = toBuffer(data).length;
+    const length = isBlob(data) ? data.size : toBuffer(data).length;
 
     //
     // The `_bufferedAmount` property is used only when the peer is a client and
@@ -99386,7 +100323,10 @@ function receiverOnError(err) {
     websocket.close(err[kStatusCode]);
   }
 
-  websocket.emit('error', err);
+  if (!websocket._errorEmitted) {
+    websocket._errorEmitted = true;
+    websocket.emit('error', err);
+  }
 }
 
 /**
@@ -99440,6 +100380,47 @@ function receiverOnPong(data) {
  */
 function resume(stream) {
   stream.resume();
+}
+
+/**
+ * The `Sender` error event handler.
+ *
+ * @param {Error} The error
+ * @private
+ */
+function senderOnError(err) {
+  const websocket = this[kWebSocket];
+
+  if (websocket.readyState === WebSocket.CLOSED) return;
+  if (websocket.readyState === WebSocket.OPEN) {
+    websocket._readyState = WebSocket.CLOSING;
+    setCloseTimer(websocket);
+  }
+
+  //
+  // `socket.end()` is used instead of `socket.destroy()` to allow the other
+  // peer to finish sending queued data. There is no need to set a timer here
+  // because `CLOSING` means that it is already set or not needed.
+  //
+  this._socket.end();
+
+  if (!websocket._errorEmitted) {
+    websocket._errorEmitted = true;
+    websocket.emit('error', err);
+  }
+}
+
+/**
+ * Set a timer to destroy the underlying raw socket of a WebSocket.
+ *
+ * @param {WebSocket} websocket The WebSocket instance
+ * @private
+ */
+function setCloseTimer(websocket) {
+  websocket._closeTimer = setTimeout(
+    websocket._socket.destroy.bind(websocket._socket),
+    closeTimeout
+  );
 }
 
 /**
@@ -99534,456 +100515,6 @@ function socketOnError() {
     this.destroy();
   }
 }
-
-
-/***/ }),
-
-/***/ 4091:
-/***/ ((module) => {
-
-"use strict";
-
-module.exports = function (Yallist) {
-  Yallist.prototype[Symbol.iterator] = function* () {
-    for (let walker = this.head; walker; walker = walker.next) {
-      yield walker.value
-    }
-  }
-}
-
-
-/***/ }),
-
-/***/ 40665:
-/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
-
-"use strict";
-
-module.exports = Yallist
-
-Yallist.Node = Node
-Yallist.create = Yallist
-
-function Yallist (list) {
-  var self = this
-  if (!(self instanceof Yallist)) {
-    self = new Yallist()
-  }
-
-  self.tail = null
-  self.head = null
-  self.length = 0
-
-  if (list && typeof list.forEach === 'function') {
-    list.forEach(function (item) {
-      self.push(item)
-    })
-  } else if (arguments.length > 0) {
-    for (var i = 0, l = arguments.length; i < l; i++) {
-      self.push(arguments[i])
-    }
-  }
-
-  return self
-}
-
-Yallist.prototype.removeNode = function (node) {
-  if (node.list !== this) {
-    throw new Error('removing node which does not belong to this list')
-  }
-
-  var next = node.next
-  var prev = node.prev
-
-  if (next) {
-    next.prev = prev
-  }
-
-  if (prev) {
-    prev.next = next
-  }
-
-  if (node === this.head) {
-    this.head = next
-  }
-  if (node === this.tail) {
-    this.tail = prev
-  }
-
-  node.list.length--
-  node.next = null
-  node.prev = null
-  node.list = null
-
-  return next
-}
-
-Yallist.prototype.unshiftNode = function (node) {
-  if (node === this.head) {
-    return
-  }
-
-  if (node.list) {
-    node.list.removeNode(node)
-  }
-
-  var head = this.head
-  node.list = this
-  node.next = head
-  if (head) {
-    head.prev = node
-  }
-
-  this.head = node
-  if (!this.tail) {
-    this.tail = node
-  }
-  this.length++
-}
-
-Yallist.prototype.pushNode = function (node) {
-  if (node === this.tail) {
-    return
-  }
-
-  if (node.list) {
-    node.list.removeNode(node)
-  }
-
-  var tail = this.tail
-  node.list = this
-  node.prev = tail
-  if (tail) {
-    tail.next = node
-  }
-
-  this.tail = node
-  if (!this.head) {
-    this.head = node
-  }
-  this.length++
-}
-
-Yallist.prototype.push = function () {
-  for (var i = 0, l = arguments.length; i < l; i++) {
-    push(this, arguments[i])
-  }
-  return this.length
-}
-
-Yallist.prototype.unshift = function () {
-  for (var i = 0, l = arguments.length; i < l; i++) {
-    unshift(this, arguments[i])
-  }
-  return this.length
-}
-
-Yallist.prototype.pop = function () {
-  if (!this.tail) {
-    return undefined
-  }
-
-  var res = this.tail.value
-  this.tail = this.tail.prev
-  if (this.tail) {
-    this.tail.next = null
-  } else {
-    this.head = null
-  }
-  this.length--
-  return res
-}
-
-Yallist.prototype.shift = function () {
-  if (!this.head) {
-    return undefined
-  }
-
-  var res = this.head.value
-  this.head = this.head.next
-  if (this.head) {
-    this.head.prev = null
-  } else {
-    this.tail = null
-  }
-  this.length--
-  return res
-}
-
-Yallist.prototype.forEach = function (fn, thisp) {
-  thisp = thisp || this
-  for (var walker = this.head, i = 0; walker !== null; i++) {
-    fn.call(thisp, walker.value, i, this)
-    walker = walker.next
-  }
-}
-
-Yallist.prototype.forEachReverse = function (fn, thisp) {
-  thisp = thisp || this
-  for (var walker = this.tail, i = this.length - 1; walker !== null; i--) {
-    fn.call(thisp, walker.value, i, this)
-    walker = walker.prev
-  }
-}
-
-Yallist.prototype.get = function (n) {
-  for (var i = 0, walker = this.head; walker !== null && i < n; i++) {
-    // abort out of the list early if we hit a cycle
-    walker = walker.next
-  }
-  if (i === n && walker !== null) {
-    return walker.value
-  }
-}
-
-Yallist.prototype.getReverse = function (n) {
-  for (var i = 0, walker = this.tail; walker !== null && i < n; i++) {
-    // abort out of the list early if we hit a cycle
-    walker = walker.prev
-  }
-  if (i === n && walker !== null) {
-    return walker.value
-  }
-}
-
-Yallist.prototype.map = function (fn, thisp) {
-  thisp = thisp || this
-  var res = new Yallist()
-  for (var walker = this.head; walker !== null;) {
-    res.push(fn.call(thisp, walker.value, this))
-    walker = walker.next
-  }
-  return res
-}
-
-Yallist.prototype.mapReverse = function (fn, thisp) {
-  thisp = thisp || this
-  var res = new Yallist()
-  for (var walker = this.tail; walker !== null;) {
-    res.push(fn.call(thisp, walker.value, this))
-    walker = walker.prev
-  }
-  return res
-}
-
-Yallist.prototype.reduce = function (fn, initial) {
-  var acc
-  var walker = this.head
-  if (arguments.length > 1) {
-    acc = initial
-  } else if (this.head) {
-    walker = this.head.next
-    acc = this.head.value
-  } else {
-    throw new TypeError('Reduce of empty list with no initial value')
-  }
-
-  for (var i = 0; walker !== null; i++) {
-    acc = fn(acc, walker.value, i)
-    walker = walker.next
-  }
-
-  return acc
-}
-
-Yallist.prototype.reduceReverse = function (fn, initial) {
-  var acc
-  var walker = this.tail
-  if (arguments.length > 1) {
-    acc = initial
-  } else if (this.tail) {
-    walker = this.tail.prev
-    acc = this.tail.value
-  } else {
-    throw new TypeError('Reduce of empty list with no initial value')
-  }
-
-  for (var i = this.length - 1; walker !== null; i--) {
-    acc = fn(acc, walker.value, i)
-    walker = walker.prev
-  }
-
-  return acc
-}
-
-Yallist.prototype.toArray = function () {
-  var arr = new Array(this.length)
-  for (var i = 0, walker = this.head; walker !== null; i++) {
-    arr[i] = walker.value
-    walker = walker.next
-  }
-  return arr
-}
-
-Yallist.prototype.toArrayReverse = function () {
-  var arr = new Array(this.length)
-  for (var i = 0, walker = this.tail; walker !== null; i++) {
-    arr[i] = walker.value
-    walker = walker.prev
-  }
-  return arr
-}
-
-Yallist.prototype.slice = function (from, to) {
-  to = to || this.length
-  if (to < 0) {
-    to += this.length
-  }
-  from = from || 0
-  if (from < 0) {
-    from += this.length
-  }
-  var ret = new Yallist()
-  if (to < from || to < 0) {
-    return ret
-  }
-  if (from < 0) {
-    from = 0
-  }
-  if (to > this.length) {
-    to = this.length
-  }
-  for (var i = 0, walker = this.head; walker !== null && i < from; i++) {
-    walker = walker.next
-  }
-  for (; walker !== null && i < to; i++, walker = walker.next) {
-    ret.push(walker.value)
-  }
-  return ret
-}
-
-Yallist.prototype.sliceReverse = function (from, to) {
-  to = to || this.length
-  if (to < 0) {
-    to += this.length
-  }
-  from = from || 0
-  if (from < 0) {
-    from += this.length
-  }
-  var ret = new Yallist()
-  if (to < from || to < 0) {
-    return ret
-  }
-  if (from < 0) {
-    from = 0
-  }
-  if (to > this.length) {
-    to = this.length
-  }
-  for (var i = this.length, walker = this.tail; walker !== null && i > to; i--) {
-    walker = walker.prev
-  }
-  for (; walker !== null && i > from; i--, walker = walker.prev) {
-    ret.push(walker.value)
-  }
-  return ret
-}
-
-Yallist.prototype.splice = function (start, deleteCount, ...nodes) {
-  if (start > this.length) {
-    start = this.length - 1
-  }
-  if (start < 0) {
-    start = this.length + start;
-  }
-
-  for (var i = 0, walker = this.head; walker !== null && i < start; i++) {
-    walker = walker.next
-  }
-
-  var ret = []
-  for (var i = 0; walker && i < deleteCount; i++) {
-    ret.push(walker.value)
-    walker = this.removeNode(walker)
-  }
-  if (walker === null) {
-    walker = this.tail
-  }
-
-  if (walker !== this.head && walker !== this.tail) {
-    walker = walker.prev
-  }
-
-  for (var i = 0; i < nodes.length; i++) {
-    walker = insert(this, walker, nodes[i])
-  }
-  return ret;
-}
-
-Yallist.prototype.reverse = function () {
-  var head = this.head
-  var tail = this.tail
-  for (var walker = head; walker !== null; walker = walker.prev) {
-    var p = walker.prev
-    walker.prev = walker.next
-    walker.next = p
-  }
-  this.head = tail
-  this.tail = head
-  return this
-}
-
-function insert (self, node, value) {
-  var inserted = node === self.head ?
-    new Node(value, null, node, self) :
-    new Node(value, node, node.next, self)
-
-  if (inserted.next === null) {
-    self.tail = inserted
-  }
-  if (inserted.prev === null) {
-    self.head = inserted
-  }
-
-  self.length++
-
-  return inserted
-}
-
-function push (self, item) {
-  self.tail = new Node(item, self.tail, null, self)
-  if (!self.head) {
-    self.head = self.tail
-  }
-  self.length++
-}
-
-function unshift (self, item) {
-  self.head = new Node(item, null, self.head, self)
-  if (!self.tail) {
-    self.tail = self.head
-  }
-  self.length++
-}
-
-function Node (value, prev, next, list) {
-  if (!(this instanceof Node)) {
-    return new Node(value, prev, next, list)
-  }
-
-  this.list = list
-  this.value = value
-
-  if (prev) {
-    prev.next = this
-    this.prev = prev
-  } else {
-    this.prev = null
-  }
-
-  if (next) {
-    next.prev = this
-    this.next = next
-  } else {
-    this.next = null
-  }
-}
-
-try {
-  // add if support for Symbol.iterator is present
-  __nccwpck_require__(4091)(Yallist)
-} catch (er) {}
 
 
 /***/ }),
@@ -100994,6 +101525,14 @@ module.exports = require("https");
 
 "use strict";
 module.exports = require("net");
+
+/***/ }),
+
+/***/ 6005:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("node:crypto");
 
 /***/ }),
 
@@ -102901,8 +103440,10 @@ class CLI {
     }
     #build(yargs) {
         const latestOrPinned = this.#pinnedBrowsers ? 'pinned' : 'latest';
+        // If there are pinned browsers allow the positional arg to be optional
+        const browserArgType = this.#pinnedBrowsers ? '[browser]' : '<browser>';
         return yargs
-            .command('install <browser>', 'Download and install the specified browser. If successful, the command outputs the actual browser buildId that was installed and the absolute path to the browser executable (format: <browser>@<buildID> <path>).', yargs => {
+            .command(`install ${browserArgType}`, 'Download and install the specified browser. If successful, the command outputs the actual browser buildId that was installed and the absolute path to the browser executable (format: <browser>@<buildID> <path>).', yargs => {
             this.#defineBrowserParameter(yargs);
             this.#definePlatformParameter(yargs);
             this.#definePathParameter(yargs);
@@ -102910,6 +103451,9 @@ class CLI {
                 type: 'string',
                 desc: 'Base URL to download from',
             });
+            if (this.#pinnedBrowsers) {
+                yargs.example('$0 install', 'Install all pinned browsers');
+            }
             yargs.example('$0 install chrome', `Install the ${latestOrPinned} available build of the Chrome browser.`);
             yargs.example('$0 install chrome@latest', 'Install the latest available build for the Chrome browser.');
             yargs.example('$0 install chrome@stable', 'Install the latest available build for the Chrome browser from the stable channel.');
@@ -102937,36 +103481,31 @@ class CLI {
             }
         }, async (argv) => {
             const args = argv;
-            args.platform ??= (0, detectPlatform_js_1.detectBrowserPlatform)();
-            if (!args.platform) {
-                throw new Error(`Could not resolve the current platform`);
-            }
-            if (args.browser.buildId === 'pinned') {
-                const pinnedVersion = this.#pinnedBrowsers?.[args.browser.name];
-                if (!pinnedVersion) {
-                    throw new Error(`No pinned version found for ${args.browser.name}`);
+            if (this.#pinnedBrowsers && !args.browser) {
+                // Use allSettled to avoid scenarios that
+                // a browser may fail early and leave the other
+                // installation in a faulty state
+                const result = await Promise.allSettled(Object.entries(this.#pinnedBrowsers).map(async ([browser, options]) => {
+                    if (options.skipDownload) {
+                        return;
+                    }
+                    await this.#install({
+                        ...argv,
+                        browser: {
+                            name: browser,
+                            buildId: options.buildId,
+                        },
+                    });
+                }));
+                for (const install of result) {
+                    if (install.status === 'rejected') {
+                        throw install.reason;
+                    }
                 }
-                args.browser.buildId = pinnedVersion;
             }
-            const originalBuildId = args.browser.buildId;
-            args.browser.buildId = await (0, browser_data_js_1.resolveBuildId)(args.browser.name, args.platform, args.browser.buildId);
-            await (0, install_js_1.install)({
-                browser: args.browser.name,
-                buildId: args.browser.buildId,
-                platform: args.platform,
-                cacheDir: args.path ?? this.#cachePath,
-                downloadProgressCallback: makeProgressCallback(args.browser.name, args.browser.buildId),
-                baseUrl: args.baseUrl,
-                buildIdAlias: originalBuildId !== args.browser.buildId
-                    ? originalBuildId
-                    : undefined,
-            });
-            console.log(`${args.browser.name}@${args.browser.buildId} ${(0, launch_js_1.computeExecutablePath)({
-                browser: args.browser.name,
-                buildId: args.browser.buildId,
-                cacheDir: args.path ?? this.#cachePath,
-                platform: args.platform,
-            })}`);
+            else {
+                await this.#install(args);
+            }
         })
             .command('launch <browser>', 'Launch the specified browser', yargs => {
             this.#defineBrowserParameter(yargs);
@@ -103038,6 +103577,39 @@ class CLI {
             : this.#pinnedBrowsers
                 ? 'pinned'
                 : 'latest';
+    }
+    async #install(args) {
+        args.platform ??= (0, detectPlatform_js_1.detectBrowserPlatform)();
+        if (!args.browser) {
+            throw new Error(`No browser arg proveded`);
+        }
+        if (!args.platform) {
+            throw new Error(`Could not resolve the current platform`);
+        }
+        if (args.browser.buildId === 'pinned') {
+            const options = this.#pinnedBrowsers?.[args.browser.name];
+            if (!options || !options.buildId) {
+                throw new Error(`No pinned version found for ${args.browser.name}`);
+            }
+            args.browser.buildId = options.buildId;
+        }
+        const originalBuildId = args.browser.buildId;
+        args.browser.buildId = await (0, browser_data_js_1.resolveBuildId)(args.browser.name, args.platform, args.browser.buildId);
+        await (0, install_js_1.install)({
+            browser: args.browser.name,
+            buildId: args.browser.buildId,
+            platform: args.platform,
+            cacheDir: args.path ?? this.#cachePath,
+            downloadProgressCallback: makeProgressCallback(args.browser.name, args.browser.buildId),
+            baseUrl: args.baseUrl,
+            buildIdAlias: originalBuildId !== args.browser.buildId ? originalBuildId : undefined,
+        });
+        console.log(`${args.browser.name}@${args.browser.buildId} ${(0, launch_js_1.computeExecutablePath)({
+            browser: args.browser.name,
+            buildId: args.browser.buildId,
+            cacheDir: args.path ?? this.#cachePath,
+            platform: args.platform,
+        })}`);
     }
 }
 exports.CLI = CLI;
@@ -104414,11 +104986,9 @@ const child_process_1 = __nccwpck_require__(32081);
 const fs_1 = __nccwpck_require__(57147);
 const promises_1 = __nccwpck_require__(73292);
 const path = __importStar(__nccwpck_require__(71017));
-const util_1 = __nccwpck_require__(73837);
 const extract_zip_1 = __importDefault(__nccwpck_require__(50460));
 const tar_fs_1 = __importDefault(__nccwpck_require__(366));
 const unbzip2_stream_1 = __importDefault(__nccwpck_require__(43467));
-const exec = (0, util_1.promisify)(child_process_1.exec);
 /**
  * @internal
  */
@@ -104465,8 +105035,13 @@ function extractTar(tarPath, folderPath) {
  * @internal
  */
 async function installDMG(dmgPath, folderPath) {
-    const { stdout } = await exec(`hdiutil attach -nobrowse -noautoopen "${dmgPath}"`);
-    const volumes = stdout.match(/\/Volumes\/(.*)/m);
+    const { stdout } = (0, child_process_1.spawnSync)(`hdiutil`, [
+        'attach',
+        '-nobrowse',
+        '-noautoopen',
+        dmgPath,
+    ]);
+    const volumes = stdout.toString('utf8').match(/\/Volumes\/(.*)/m);
     if (!volumes) {
         throw new Error(`Could not find volume path in ${stdout}`);
     }
@@ -104480,10 +105055,10 @@ async function installDMG(dmgPath, folderPath) {
             throw new Error(`Cannot find app in ${mountPath}`);
         }
         const mountedPath = path.join(mountPath, appName);
-        await exec(`cp -R "${mountedPath}" "${folderPath}"`);
+        (0, child_process_1.spawnSync)('cp', ['-R', mountedPath, folderPath]);
     }
     finally {
-        await exec(`hdiutil detach "${mountPath}" -quiet`);
+        (0, child_process_1.spawnSync)('hdiutil', ['detach', mountPath, '-quiet']);
     }
 }
 //# sourceMappingURL=fileUtil.js.map
@@ -104668,6 +105243,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.canDownload = exports.getInstalledBrowsers = exports.uninstall = exports.install = void 0;
 const assert_1 = __importDefault(__nccwpck_require__(39491));
+const child_process_1 = __nccwpck_require__(32081);
 const fs_1 = __nccwpck_require__(57147);
 const promises_1 = __nccwpck_require__(73292);
 const os_1 = __importDefault(__nccwpck_require__(22037));
@@ -104777,6 +105353,7 @@ async function installUrl(url, options) {
             if (!(0, fs_1.existsSync)(installedBrowser.executablePath)) {
                 throw new Error(`The browser folder (${outputPath}) exists but the executable (${installedBrowser.executablePath}) is missing`);
             }
+            await runSetup(installedBrowser);
             return installedBrowser;
         }
         debugInstall(`Downloading binary from ${url}`);
@@ -104801,11 +105378,36 @@ async function installUrl(url, options) {
             metadata.aliases[options.buildIdAlias] = options.buildId;
             installedBrowser.writeMetadata(metadata);
         }
+        await runSetup(installedBrowser);
         return installedBrowser;
     }
     finally {
         if ((0, fs_1.existsSync)(archivePath)) {
             await (0, promises_1.unlink)(archivePath);
+        }
+    }
+}
+async function runSetup(installedBrowser) {
+    // On Windows for Chrome invoke setup.exe to configure sandboxes.
+    if ((installedBrowser.platform === browser_data_js_1.BrowserPlatform.WIN32 ||
+        installedBrowser.platform === browser_data_js_1.BrowserPlatform.WIN64) &&
+        installedBrowser.browser === browser_data_js_1.Browser.CHROME &&
+        installedBrowser.platform === (0, detectPlatform_js_1.detectBrowserPlatform)()) {
+        try {
+            debugTime('permissions');
+            const browserDir = path_1.default.dirname(installedBrowser.executablePath);
+            const setupExePath = path_1.default.join(browserDir, 'setup.exe');
+            if (!(0, fs_1.existsSync)(setupExePath)) {
+                return;
+            }
+            (0, child_process_1.spawnSync)(path_1.default.join(browserDir, 'setup.exe'), [`--configure-browser-in-directory=` + browserDir], {
+                shell: true,
+            });
+            // TODO: Handle error here. Currently the setup.exe sometimes
+            // errors although it sets the permissions correctly.
+        }
+        finally {
+            debugTimeEnd('permissions');
         }
     }
 }
@@ -106654,11 +107256,17 @@ class Browser extends EventEmitter_js_1.EventEmitter {
     }
     /** @internal */
     [disposable_js_1.disposeSymbol]() {
-        return void this.close().catch(util_js_1.debugError);
+        if (this.process()) {
+            return void this.close().catch(util_js_1.debugError);
+        }
+        return void this.disconnect().catch(util_js_1.debugError);
     }
     /** @internal */
     [disposable_js_1.asyncDisposeSymbol]() {
-        return this.close();
+        if (this.process()) {
+            return this.close();
+        }
+        return this.disconnect();
     }
 }
 exports.Browser = Browser;
@@ -106682,6 +107290,7 @@ const rxjs_js_1 = __nccwpck_require__(35006);
 const EventEmitter_js_1 = __nccwpck_require__(7692);
 const util_js_1 = __nccwpck_require__(78274);
 const disposable_js_1 = __nccwpck_require__(97805);
+const Mutex_js_1 = __nccwpck_require__(2828);
 /**
  * {@link BrowserContext} represents individual user contexts within a
  * {@link Browser | browser}.
@@ -106719,6 +107328,32 @@ class BrowserContext extends EventEmitter_js_1.EventEmitter {
      */
     constructor() {
         super();
+    }
+    /**
+     * If defined, indicates an ongoing screenshot opereation.
+     */
+    #pageScreenshotMutex;
+    #screenshotOperationsCount = 0;
+    /**
+     * @internal
+     */
+    startScreenshot() {
+        const mutex = this.#pageScreenshotMutex || new Mutex_js_1.Mutex();
+        this.#pageScreenshotMutex = mutex;
+        this.#screenshotOperationsCount++;
+        return mutex.acquire(() => {
+            this.#screenshotOperationsCount--;
+            if (this.#screenshotOperationsCount === 0) {
+                // Remove the mutex to indicate no ongoing screenshot operation.
+                this.#pageScreenshotMutex = undefined;
+            }
+        });
+    }
+    /**
+     * @internal
+     */
+    waitForScreenshotOperations() {
+        return this.#pageScreenshotMutex?.acquire();
     }
     /**
      * Waits until a {@link Target | target} matching the given `predicate`
@@ -106885,7 +107520,10 @@ class Dialog {
     #type;
     #message;
     #defaultValue;
-    #handled = false;
+    /**
+     * @internal
+     */
+    handled = false;
     /**
      * @internal
      */
@@ -106921,8 +107559,8 @@ class Dialog {
      *
      */
     async accept(promptText) {
-        (0, assert_js_1.assert)(!this.#handled, 'Cannot accept dialog which is already handled!');
-        this.#handled = true;
+        (0, assert_js_1.assert)(!this.handled, 'Cannot accept dialog which is already handled!');
+        this.handled = true;
         await this.handle({
             accept: true,
             text: promptText,
@@ -106932,8 +107570,8 @@ class Dialog {
      * A promise which will resolve once the dialog has been dismissed
      */
     async dismiss() {
-        (0, assert_js_1.assert)(!this.#handled, 'Cannot dismiss dialog which is already handled!');
-        this.#handled = true;
+        (0, assert_js_1.assert)(!this.handled, 'Cannot dismiss dialog which is already handled!');
+        this.handled = true;
         await this.handle({
             accept: false,
         });
@@ -107033,6 +107671,10 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
     var e = new Error(message);
     return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
 });
+var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
+    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
+    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
+};
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.ElementHandle = void 0;
 const GetQueryHandler_js_1 = __nccwpck_require__(33465);
@@ -107085,6 +107727,8 @@ let ElementHandle = (() => {
     let _jsonValue_decorators;
     let _$_decorators;
     let _$$_decorators;
+    let _private_$$_decorators;
+    let _private_$$_descriptor;
     let _waitForSelector_decorators;
     let _isVisible_decorators;
     let _isHidden_decorators;
@@ -107117,7 +107761,8 @@ let ElementHandle = (() => {
             _getProperties_decorators = [(0, decorators_js_1.throwIfDisposed)(), (_b = ElementHandle).bindIsolatedHandle.bind(_b)];
             _jsonValue_decorators = [(0, decorators_js_1.throwIfDisposed)(), (_c = ElementHandle).bindIsolatedHandle.bind(_c)];
             _$_decorators = [(0, decorators_js_1.throwIfDisposed)(), (_d = ElementHandle).bindIsolatedHandle.bind(_d)];
-            _$$_decorators = [(0, decorators_js_1.throwIfDisposed)(), (_e = ElementHandle).bindIsolatedHandle.bind(_e)];
+            _$$_decorators = [(0, decorators_js_1.throwIfDisposed)()];
+            _private_$$_decorators = [(_e = ElementHandle).bindIsolatedHandle.bind(_e)];
             _waitForSelector_decorators = [(0, decorators_js_1.throwIfDisposed)(), (_f = ElementHandle).bindIsolatedHandle.bind(_f)];
             _isVisible_decorators = [(0, decorators_js_1.throwIfDisposed)(), (_g = ElementHandle).bindIsolatedHandle.bind(_g)];
             _isHidden_decorators = [(0, decorators_js_1.throwIfDisposed)(), (_h = ElementHandle).bindIsolatedHandle.bind(_h)];
@@ -107148,6 +107793,9 @@ let ElementHandle = (() => {
             __esDecorate(this, null, _jsonValue_decorators, { kind: "method", name: "jsonValue", static: false, private: false, access: { has: obj => "jsonValue" in obj, get: obj => obj.jsonValue }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _$_decorators, { kind: "method", name: "$", static: false, private: false, access: { has: obj => "$" in obj, get: obj => obj.$ }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _$$_decorators, { kind: "method", name: "$$", static: false, private: false, access: { has: obj => "$$" in obj, get: obj => obj.$$ }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, _private_$$_descriptor = { value: __setFunctionName(async function (selector) {
+                    return await this.#$$impl(selector);
+                }, "#$$") }, _private_$$_decorators, { kind: "method", name: "#$$", static: false, private: true, access: { has: obj => #$$ in obj, get: obj => obj.#$$ }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _waitForSelector_decorators, { kind: "method", name: "waitForSelector", static: false, private: false, access: { has: obj => "waitForSelector" in obj, get: obj => obj.waitForSelector }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _isVisible_decorators, { kind: "method", name: "isVisible", static: false, private: false, access: { has: obj => "isVisible" in obj, get: obj => obj.isVisible }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _isHidden_decorators, { kind: "method", name: "isHidden", static: false, private: false, access: { has: obj => "isHidden" in obj, get: obj => obj.isHidden }, metadata: _metadata }, null, _instanceExtraInitializers);
@@ -107180,7 +107828,7 @@ let ElementHandle = (() => {
          * Cached isolatedHandle to prevent
          * trying to adopt it multiple times
          */
-        isolatedHandle = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        isolatedHandle = __runInitializers(this, _instanceExtraInitializers);
         /**
          * A given method will have it's `this` replaced with an isolated version of
          * `this` when decorated with this decorator.
@@ -107316,7 +107964,21 @@ let ElementHandle = (() => {
         /**
          * Queries the current element for an element matching the given selector.
          *
-         * @param selector - The selector to query for.
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @returns A {@link ElementHandle | element handle} to the first element
          * matching the given selector. Otherwise, `null`.
          */
@@ -107327,11 +107989,42 @@ let ElementHandle = (() => {
         /**
          * Queries the current element for all elements matching the given selector.
          *
-         * @param selector - The selector to query for.
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @returns An array of {@link ElementHandle | element handles} that point to
          * elements matching the given selector.
          */
-        async $$(selector) {
+        async $$(selector, options) {
+            if (options?.isolate === false) {
+                return await this.#$$impl(selector);
+            }
+            return await this.#$$(selector);
+        }
+        /**
+         * Isolates {@link ElementHandle.$$} if needed.
+         *
+         * @internal
+         */
+        get #$$() { return _private_$$_descriptor.value; }
+        /**
+         * Implementation for {@link ElementHandle.$$}.
+         *
+         * @internal
+         */
+        async #$$impl(selector) {
             const { updatedSelector, QueryHandler } = (0, GetQueryHandler_js_1.getQueryHandlerAndSelector)(selector);
             return await AsyncIterableUtil_js_1.AsyncIterableUtil.collect(QueryHandler.queryAll(this, updatedSelector));
         }
@@ -107354,7 +108047,21 @@ let ElementHandle = (() => {
          * );
          * ```
          *
-         * @param selector - The selector to query for.
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @param pageFunction - The function to be evaluated in this element's page's
          * context. The first element matching the selector will be passed in as the
          * first argument.
@@ -107405,7 +108112,21 @@ let ElementHandle = (() => {
          * ).toEqual(['Hello!', 'Hi!']);
          * ```
          *
-         * @param selector - The selector to query for.
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @param pageFunction - The function to be evaluated in the element's page's
          * context. An array of elements matching the given selector will be passed to
          * the function as its first argument.
@@ -107474,8 +108195,11 @@ let ElementHandle = (() => {
          * @throws Throws if an element matching the given selector doesn't appear.
          */
         async waitForSelector(selector, options = {}) {
-            const { updatedSelector, QueryHandler } = (0, GetQueryHandler_js_1.getQueryHandlerAndSelector)(selector);
-            return (await QueryHandler.waitFor(this, updatedSelector, options));
+            const { updatedSelector, QueryHandler, polling } = (0, GetQueryHandler_js_1.getQueryHandlerAndSelector)(selector);
+            return (await QueryHandler.waitFor(this, updatedSelector, {
+                polling,
+                ...options,
+            }));
         }
         async #checkVisibility(visibility) {
             return await this.evaluate(async (element, PuppeteerUtil, visibility) => {
@@ -107485,15 +108209,32 @@ let ElementHandle = (() => {
             }), visibility);
         }
         /**
-         * Checks if an element is visible using the same mechanism as
-         * {@link ElementHandle.waitForSelector}.
+         * An element is considered to be visible if all of the following is
+         * true:
+         *
+         * - the element has
+         *   {@link https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle | computed styles}.
+         *
+         * - the element has a non-empty
+         *   {@link https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect | bounding client rect}.
+         *
+         * - the element's {@link https://developer.mozilla.org/en-US/docs/Web/CSS/visibility | visibility}
+         *   is not `hidden` or `collapse`.
          */
         async isVisible() {
             return await this.#checkVisibility(true);
         }
         /**
-         * Checks if an element is hidden using the same mechanism as
-         * {@link ElementHandle.waitForSelector}.
+         * An element is considered to be hidden if at least one of the following is true:
+         *
+         * - the element has no
+         *   {@link https://developer.mozilla.org/en-US/docs/Web/API/Window/getComputedStyle | computed styles}.
+         *
+         * - the element has an empty
+         *   {@link https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect | bounding client rect}.
+         *
+         * - the element's {@link https://developer.mozilla.org/en-US/docs/Web/CSS/visibility | visibility}
+         *   is `hidden` or `collapse`.
          */
         async isHidden() {
             return await this.#checkVisibility(false);
@@ -108468,7 +109209,7 @@ let Frame = (() => {
         /**
          * @internal
          */
-        _id = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        _id = __runInitializers(this, _instanceExtraInitializers);
         /**
          * @internal
          */
@@ -108493,12 +109234,8 @@ let Frame = (() => {
          */
         #document() {
             if (!this.#_document) {
-                this.#_document = this.isolatedRealm()
-                    .evaluateHandle(() => {
+                this.#_document = this.mainRealm().evaluateHandle(() => {
                     return document;
-                })
-                    .then(handle => {
-                    return this.mainRealm().transferHandle(handle);
                 });
             }
             return this.#_document;
@@ -108555,7 +109292,7 @@ let Frame = (() => {
          * Behaves identically to {@link Page.evaluateHandle} except it's run within
          * the context of this frame.
          *
-         * @see {@link Page.evaluateHandle} for details.
+         * See {@link Page.evaluateHandle} for details.
          */
         async evaluateHandle(pageFunction, ...args) {
             pageFunction = (0, util_js_1.withSourcePuppeteerURLIfNone)(this.evaluateHandle.name, pageFunction);
@@ -108565,7 +109302,7 @@ let Frame = (() => {
          * Behaves identically to {@link Page.evaluate} except it's run within
          * the context of this frame.
          *
-         * @see {@link Page.evaluate} for details.
+         * See {@link Page.evaluate} for details.
          */
         async evaluate(pageFunction, ...args) {
             pageFunction = (0, util_js_1.withSourcePuppeteerURLIfNone)(this.evaluate.name, pageFunction);
@@ -108585,7 +109322,22 @@ let Frame = (() => {
         /**
          * Queries the frame for an element matching the given selector.
          *
-         * @param selector - The selector to query for.
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
+         *
          * @returns A {@link ElementHandle | element handle} to the first element
          * matching the given selector. Otherwise, `null`.
          */
@@ -108597,14 +109349,29 @@ let Frame = (() => {
         /**
          * Queries the frame for all elements matching the given selector.
          *
-         * @param selector - The selector to query for.
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
+         *
          * @returns An array of {@link ElementHandle | element handles} that point to
          * elements matching the given selector.
          */
-        async $$(selector) {
+        async $$(selector, options) {
             // eslint-disable-next-line rulesdir/use-using -- This is cached.
             const document = await this.#document();
-            return await document.$$(selector);
+            return await document.$$(selector, options);
         }
         /**
          * Runs the given function on the first element matching the given selector in
@@ -108619,7 +109386,21 @@ let Frame = (() => {
          * const searchValue = await frame.$eval('#search', el => el.value);
          * ```
          *
-         * @param selector - The selector to query for.
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @param pageFunction - The function to be evaluated in the frame's context.
          * The first element matching the selector will be passed to the function as
          * its first argument.
@@ -108645,7 +109426,21 @@ let Frame = (() => {
          * const divsCounts = await frame.$$eval('div', divs => divs.length);
          * ```
          *
-         * @param selector - The selector to query for.
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @param pageFunction - The function to be evaluated in the frame's context.
          * An array of elements matching the given selector will be passed to the
          * function as its first argument.
@@ -108694,8 +109489,11 @@ let Frame = (() => {
          * @throws Throws if an element matching the given selector doesn't appear.
          */
         async waitForSelector(selector, options = {}) {
-            const { updatedSelector, QueryHandler } = (0, GetQueryHandler_js_1.getQueryHandlerAndSelector)(selector);
-            return (await QueryHandler.waitFor(this, updatedSelector, options));
+            const { updatedSelector, QueryHandler, polling } = (0, GetQueryHandler_js_1.getQueryHandlerAndSelector)(selector);
+            return (await QueryHandler.waitFor(this, updatedSelector, {
+                polling,
+                ...options,
+            }));
         }
         /**
          * @example
@@ -109214,7 +110012,7 @@ class HTTPRequest {
         await this.interception.handlers.reduce((promiseChain, interceptAction) => {
             return promiseChain.then(interceptAction);
         }, Promise.resolve());
-        this.interception.handlers = []; // TODO: verify this is correct top let gc run
+        this.interception.handlers = [];
         const { action } = this.interceptResolutionState();
         switch (action) {
             case 'abort':
@@ -109380,6 +110178,23 @@ class HTTPRequest {
             return;
         }
     }
+    /**
+     * @internal
+     */
+    static getResponse(body) {
+        // Needed to get the correct byteLength
+        const byteBody = (0, util_js_1.isString)(body)
+            ? new TextEncoder().encode(body)
+            : body;
+        const bytes = [];
+        for (const byte of byteBody) {
+            bytes.push(String.fromCharCode(byte));
+        }
+        return {
+            contentLength: byteBody.byteLength,
+            base64: btoa(bytes.join('')),
+        };
+    }
 }
 exports.HTTPRequest = HTTPRequest;
 /**
@@ -109503,7 +110318,12 @@ const errorReasons = {
  * @internal
  */
 function handleError(error) {
-    if (error.originalMessage.includes('Invalid header')) {
+    // Firefox throws an invalid argument error with a message starting with
+    // 'Expected "header" [...]'.
+    if (error.originalMessage.includes('Invalid header') ||
+        error.originalMessage.includes('Expected "header"') ||
+        // WebDriver BiDi error for invalid values, for example, headers.
+        error.originalMessage.includes('invalid argument')) {
         throw error;
     }
     // In certain cases, protocol will return error if the request was
@@ -109647,8 +110467,9 @@ exports.MouseButton = Object.freeze({
 /**
  * The Mouse class operates in main-frame CSS pixels
  * relative to the top-left corner of the viewport.
+ *
  * @remarks
- * Every `page` object has its own Mouse, accessible with [`page.mouse`](#pagemouse).
+ * Every `page` object has its own Mouse, accessible with {@link Page.mouse}.
  *
  * @example
  *
@@ -110234,6 +111055,12 @@ let Page = (() => {
             }
             return super.off(type, handler);
         }
+        /**
+         * {@inheritDoc Accessibility}
+         */
+        get accessibility() {
+            return this.mainFrame().accessibility;
+        }
         locator(selectorOrFunc) {
             if (typeof selectorOrFunc === 'string') {
                 return locators_js_1.NodeLocator.create(this, selectorOrFunc);
@@ -110251,28 +111078,58 @@ let Page = (() => {
             return locators_js_1.Locator.race(locators);
         }
         /**
-         * Runs `document.querySelector` within the page. If no element matches the
-         * selector, the return value resolves to `null`.
+         * Finds the first element that matches the selector. If no element matches
+         * the selector, the return value resolves to `null`.
          *
-         * @param selector - A `selector` to query page for
-         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | selector}
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
          * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
+         *
+         * @remarks
+         *
+         * Shortcut for {@link Frame.$ | Page.mainFrame().$(selector) }.
          */
         async $(selector) {
             return await this.mainFrame().$(selector);
         }
         /**
-         * The method runs `document.querySelectorAll` within the page. If no elements
+         * Finds elements on the page that match the selector. If no elements
          * match the selector, the return value resolves to `[]`.
          *
-         * @param selector - A `selector` to query page for
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          *
          * @remarks
          *
          * Shortcut for {@link Frame.$$ | Page.mainFrame().$$(selector) }.
          */
-        async $$(selector) {
-            return await this.mainFrame().$$(selector);
+        async $$(selector, options) {
+            return await this.mainFrame().$$(selector, options);
         }
         /**
          * @remarks
@@ -110336,8 +111193,8 @@ let Page = (() => {
             return await this.mainFrame().evaluateHandle(pageFunction, ...args);
         }
         /**
-         * This method runs `document.querySelector` within the page and passes the
-         * result as the first argument to the `pageFunction`.
+         * This method finds the first element within the page that matches the selector
+         * and passes the result as the first argument to the `pageFunction`.
          *
          * @remarks
          *
@@ -110385,11 +111242,23 @@ let Page = (() => {
          * );
          * ```
          *
-         * @param selector - the
-         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | selector}
-         * to query for
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @param pageFunction - the function to be evaluated in the page context.
-         * Will be passed the result of `document.querySelector(selector)` as its
+         * Will be passed the result of the element matching the selector as its
          * first argument.
          * @param args - any additional arguments to pass through to `pageFunction`.
          *
@@ -110402,8 +111271,8 @@ let Page = (() => {
             return await this.mainFrame().$eval(selector, pageFunction, ...args);
         }
         /**
-         * This method runs `Array.from(document.querySelectorAll(selector))` within
-         * the page and passes the result as the first argument to the `pageFunction`.
+         * This method returns all elements matching the selector and passes the
+         * resulting array as the first argument to the `pageFunction`.
          *
          * @remarks
          * If `pageFunction` returns a promise `$$eval` will wait for the promise to
@@ -110446,12 +111315,23 @@ let Page = (() => {
          * );
          * ```
          *
-         * @param selector - the
-         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | selector}
-         * to query for
+         * @param selector -
+         * {@link https://pptr.dev/guides/page-interactions#selectors | selector}
+         * to query page for.
+         * {@link https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Selectors | CSS selectors}
+         * can be passed as-is and a
+         * {@link https://pptr.dev/guides/page-interactions#non-css-selectors | Puppeteer-specific selector syntax}
+         * allows quering by
+         * {@link https://pptr.dev/guides/page-interactions#text-selectors--p-text | text},
+         * {@link https://pptr.dev/guides/page-interactions#aria-selectors--p-aria | a11y role and name},
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#xpath-selectors--p-xpath | xpath}
+         * and
+         * {@link https://pptr.dev/guides/page-interactions#querying-elements-in-shadow-dom | combining these queries across shadow roots}.
+         * Alternatively, you can specify the selector type using a
+         * {@link https://pptr.dev/guides/page-interactions#prefixed-selector-syntax | prefix}.
          * @param pageFunction - the function to be evaluated in the page context.
-         * Will be passed the result of
-         * `Array.from(document.querySelectorAll(selector))` as its first argument.
+         * Will be passed an array of matching elements as its first argument.
          * @param args - any additional arguments to pass through to `pageFunction`.
          *
          * @returns The result of calling `pageFunction`. If it returns an element it
@@ -110500,68 +111380,12 @@ let Page = (() => {
          *
          * @param html - HTML markup to assign to the page.
          * @param options - Parameters that has some properties.
-         *
-         * @remarks
-         *
-         * The parameter `options` might have the following options.
-         *
-         * - `timeout` : Maximum time in milliseconds for resources to load, defaults
-         *   to 30 seconds, pass `0` to disable timeout. The default value can be
-         *   changed by using the {@link Page.setDefaultNavigationTimeout} or
-         *   {@link Page.setDefaultTimeout} methods.
-         *
-         * - `waitUntil`: When to consider setting markup succeeded, defaults to
-         *   `load`. Given an array of event strings, setting content is considered
-         *   to be successful after all events have been fired. Events can be
-         *   either:<br/>
-         * - `load` : consider setting content to be finished when the `load` event
-         *   is fired.<br/>
-         * - `domcontentloaded` : consider setting content to be finished when the
-         *   `DOMContentLoaded` event is fired.<br/>
-         * - `networkidle0` : consider setting content to be finished when there are
-         *   no more than 0 network connections for at least `500` ms.<br/>
-         * - `networkidle2` : consider setting content to be finished when there are
-         *   no more than 2 network connections for at least `500` ms.
          */
         async setContent(html, options) {
             await this.mainFrame().setContent(html, options);
         }
         /**
-         * Navigates the page to the given `url`.
-         *
-         * @remarks
-         *
-         * Navigation to `about:blank` or navigation to the same URL with a different
-         * hash will succeed and return `null`.
-         *
-         * :::warning
-         *
-         * Headless mode doesn't support navigation to a PDF document. See the {@link
-         * https://bugs.chromium.org/p/chromium/issues/detail?id=761295 | upstream
-         * issue}.
-         *
-         * :::
-         *
-         * Shortcut for {@link Frame.goto | page.mainFrame().goto(url, options)}.
-         *
-         * @param url - URL to navigate page to. The URL should include scheme, e.g.
-         * `https://`
-         * @param options - Options to configure waiting behavior.
-         * @returns A promise which resolves to the main resource response. In case of
-         * multiple redirects, the navigation will resolve with the response of the
-         * last redirect.
-         * @throws If:
-         *
-         * - there's an SSL error (e.g. in case of self-signed certificates).
-         * - target URL is invalid.
-         * - the timeout is exceeded during navigation.
-         * - the remote server does not respond or is unreachable.
-         * - the main resource failed to load.
-         *
-         * This method will not throw an error when any valid HTTP status code is
-         * returned by the remote server, including 404 "Not Found" and 500 "Internal
-         * Server Error". The status code for such responses can be retrieved by
-         * calling {@link HTTPResponse.status}.
+         * {@inheritDoc Frame.goto}
          */
         async goto(url, options) {
             return await this.mainFrame().goto(url, options);
@@ -110621,14 +111445,14 @@ let Page = (() => {
          *   {@link Page.setDefaultTimeout} method.
          */
         waitForRequest(urlOrPredicate, options = {}) {
-            const { timeout: ms = this._timeoutSettings.timeout() } = options;
+            const { timeout: ms = this._timeoutSettings.timeout(), signal } = options;
             if (typeof urlOrPredicate === 'string') {
                 const url = urlOrPredicate;
                 urlOrPredicate = (request) => {
                     return request.url() === url;
                 };
             }
-            const observable$ = (0, util_js_1.fromEmitterEvent)(this, "request" /* PageEvent.Request */).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
+            const observable$ = (0, util_js_1.fromEmitterEvent)(this, "request" /* PageEvent.Request */).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Page closed!');
             }))));
             return (0, rxjs_js_1.firstValueFrom)(observable$);
@@ -110661,14 +111485,14 @@ let Page = (() => {
          *   the {@link Page.setDefaultTimeout} method.
          */
         waitForResponse(urlOrPredicate, options = {}) {
-            const { timeout: ms = this._timeoutSettings.timeout() } = options;
+            const { timeout: ms = this._timeoutSettings.timeout(), signal } = options;
             if (typeof urlOrPredicate === 'string') {
                 const url = urlOrPredicate;
                 urlOrPredicate = (response) => {
                     return response.url() === url;
                 };
             }
-            const observable$ = (0, util_js_1.fromEmitterEvent)(this, "response" /* PageEvent.Response */).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
+            const observable$ = (0, util_js_1.fromEmitterEvent)(this, "response" /* PageEvent.Response */).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Page closed!');
             }))));
             return (0, rxjs_js_1.firstValueFrom)(observable$);
@@ -110686,13 +111510,13 @@ let Page = (() => {
          * @internal
          */
         waitForNetworkIdle$(options = {}) {
-            const { timeout: ms = this._timeoutSettings.timeout(), idleTime = util_js_1.NETWORK_IDLE_TIME, concurrency = 0, } = options;
+            const { timeout: ms = this._timeoutSettings.timeout(), idleTime = util_js_1.NETWORK_IDLE_TIME, concurrency = 0, signal, } = options;
             return this.#inflight$.pipe((0, rxjs_js_1.switchMap)(inflight => {
                 if (inflight > concurrency) {
                     return rxjs_js_1.EMPTY;
                 }
                 return (0, rxjs_js_1.timer)(idleTime);
-            }), (0, rxjs_js_1.map)(() => { }), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
+            }), (0, rxjs_js_1.map)(() => { }), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Page closed!');
             }))));
         }
@@ -110708,13 +111532,13 @@ let Page = (() => {
          * ```
          */
         async waitForFrame(urlOrPredicate, options = {}) {
-            const { timeout: ms = this.getDefaultTimeout() } = options;
-            if ((0, util_js_1.isString)(urlOrPredicate)) {
-                urlOrPredicate = (frame) => {
+            const { timeout: ms = this.getDefaultTimeout(), signal } = options;
+            const predicate = (0, util_js_1.isString)(urlOrPredicate)
+                ? (frame) => {
                     return urlOrPredicate === frame.url();
-                };
-            }
-            return await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.merge)((0, util_js_1.fromEmitterEvent)(this, "frameattached" /* PageEvent.FrameAttached */), (0, util_js_1.fromEmitterEvent)(this, "framenavigated" /* PageEvent.FrameNavigated */), (0, rxjs_js_1.from)(this.frames())).pipe((0, util_js_1.filterAsync)(urlOrPredicate), (0, rxjs_js_1.first)(), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
+                }
+                : urlOrPredicate;
+            return await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.merge)((0, util_js_1.fromEmitterEvent)(this, "frameattached" /* PageEvent.FrameAttached */), (0, util_js_1.fromEmitterEvent)(this, "framenavigated" /* PageEvent.FrameNavigated */), (0, rxjs_js_1.from)(this.frames())).pipe((0, util_js_1.filterAsync)(predicate), (0, rxjs_js_1.first)(), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), (0, util_js_1.fromEmitterEvent)(this, "close" /* PageEvent.Close */).pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Page closed.');
             })))));
         }
@@ -110735,7 +111559,7 @@ let Page = (() => {
          *
          * ```ts
          * import {KnownDevices} from 'puppeteer';
-         * const iPhone = KnownDevices['iPhone 6'];
+         * const iPhone = KnownDevices['iPhone 15 Pro'];
          *
          * (async () => {
          *   const browser = await puppeteer.launch();
@@ -110977,6 +111801,7 @@ let Page = (() => {
         async screenshot(userOptions = {}) {
             const env_2 = { stack: [], error: void 0, hasError: false };
             try {
+                const _guard = __addDisposableResource(env_2, await this.browserContext().startScreenshot(), false);
                 await this.bringToFront();
                 // TODO: use structuredClone after Node 16 support is dropped.
                 const options = {
@@ -111007,7 +111832,7 @@ let Page = (() => {
                     }
                 }
                 if (options.quality !== undefined) {
-                    if (options.quality < 0 && options.quality > 100) {
+                    if (options.quality < 0 || options.quality > 100) {
                         throw new Error(`Expected 'quality' (${options.quality}) to be between 0 and 100, inclusive.`);
                     }
                     if (options.type === undefined ||
@@ -111052,15 +111877,7 @@ let Page = (() => {
                                 ...scrollDimensions,
                             });
                             stack.defer(async () => {
-                                if (viewport) {
-                                    await this.setViewport(viewport).catch(util_js_1.debugError);
-                                }
-                                else {
-                                    await this.setViewport({
-                                        width: 0,
-                                        height: 0,
-                                    }).catch(util_js_1.debugError);
-                                }
+                                await this.setViewport(viewport).catch(util_js_1.debugError);
                             });
                         }
                     }
@@ -111458,9 +112275,13 @@ class Realm {
     }
     #disposed = false;
     /** @internal */
-    [disposable_js_1.disposeSymbol]() {
+    dispose() {
         this.#disposed = true;
         this.taskManager.terminateAll(new Error('waitForFunction failed: frame got detached.'));
+    }
+    /** @internal */
+    [disposable_js_1.disposeSymbol]() {
+        this.dispose();
     }
 }
 exports.Realm = Realm;
@@ -111763,12 +112584,14 @@ var LocatorEvent;
  * whole operation is retried. Various preconditions for a successful action are
  * checked automatically.
  *
+ * See {@link https://pptr.dev/guides/page-interactions#locators} for details.
+ *
  * @public
  */
 class Locator extends EventEmitter_js_1.EventEmitter {
     /**
-     * Creates a race between multiple locators but ensures that only a single one
-     * acts.
+     * Creates a race between multiple locators trying to locate elements in
+     * parallel but ensures that only a single element receives the action.
      *
      * @public
      */
@@ -111800,12 +112623,7 @@ class Locator extends EventEmitter_js_1.EventEmitter {
         retryAndRaceWithSignalAndTimer: (signal, cause) => {
             const candidates = [];
             if (signal) {
-                candidates.push((0, rxjs_js_1.fromEvent)(signal, 'abort').pipe((0, rxjs_js_1.map)(() => {
-                    if (signal.reason instanceof Error) {
-                        signal.reason.cause = cause;
-                    }
-                    throw signal.reason;
-                })));
+                candidates.push((0, util_js_1.fromAbortSignal)(signal, cause));
             }
             candidates.push((0, util_js_1.timeout)(this._timeout, cause));
             return (0, rxjs_js_1.pipe)((0, rxjs_js_1.retry)({ delay: exports.RETRY_DELAY }), (0, rxjs_js_1.raceWith)(...candidates));
@@ -111815,26 +112633,59 @@ class Locator extends EventEmitter_js_1.EventEmitter {
     get timeout() {
         return this._timeout;
     }
+    /**
+     * Creates a new locator instance by cloning the current locator and setting
+     * the total timeout for the locator actions.
+     *
+     * Pass `0` to disable timeout.
+     *
+     * @defaultValue `Page.getDefaultTimeout()`
+     */
     setTimeout(timeout) {
         const locator = this._clone();
         locator._timeout = timeout;
         return locator;
     }
+    /**
+     * Creates a new locator instance by cloning the current locator with the
+     * visibility property changed to the specified value.
+     */
     setVisibility(visibility) {
         const locator = this._clone();
         locator.visibility = visibility;
         return locator;
     }
+    /**
+     * Creates a new locator instance by cloning the current locator and
+     * specifying whether to wait for input elements to become enabled before the
+     * action. Applicable to `click` and `fill` actions.
+     *
+     * @defaultValue `true`
+     */
     setWaitForEnabled(value) {
         const locator = this._clone();
         locator.#waitForEnabled = value;
         return locator;
     }
+    /**
+     * Creates a new locator instance by cloning the current locator and
+     * specifying whether the locator should scroll the element into viewport if
+     * it is not in the viewport already.
+     *
+     * @defaultValue `true`
+     */
     setEnsureElementIsInTheViewport(value) {
         const locator = this._clone();
         locator.#ensureElementIsInTheViewport = value;
         return locator;
     }
+    /**
+     * Creates a new locator instance by cloning the current locator and
+     * specifying whether the locator has to wait for the element's bounding box
+     * to be same between two consecutive animation frames.
+     *
+     * @defaultValue `true`
+     */
     setWaitForStableBoundingBox(value) {
         const locator = this._clone();
         locator.#waitForStableBoundingBox = value;
@@ -112162,21 +113013,30 @@ class Locator extends EventEmitter_js_1.EventEmitter {
     mapHandle(mapper) {
         return new MappedLocator(this._clone(), mapper);
     }
+    /**
+     * Clicks the located element.
+     */
     click(options) {
         return (0, rxjs_js_1.firstValueFrom)(this.#click(options));
     }
     /**
      * Fills out the input identified by the locator using the provided value. The
      * type of the input is determined at runtime and the appropriate fill-out
-     * method is chosen based on the type. contenteditable, selector, inputs are
-     * supported.
+     * method is chosen based on the type. `contenteditable`, select, textarea and
+     * input elements are supported.
      */
     fill(value, options) {
         return (0, rxjs_js_1.firstValueFrom)(this.#fill(value, options));
     }
+    /**
+     * Hovers over the located element.
+     */
     hover(options) {
         return (0, rxjs_js_1.firstValueFrom)(this.#hover(options));
     }
+    /**
+     * Scrolls the located element.
+     */
     scroll(options) {
         return (0, rxjs_js_1.firstValueFrom)(this.#scroll(options));
     }
@@ -112464,10 +113324,16 @@ async function connectBidiOverCdp(cdp, options) {
         // Forwards a BiDi event sent by BidiServer to Puppeteer.
         pptrTransport.onmessage(JSON.stringify(message));
     });
-    const pptrBiDiConnection = new Connection_js_1.BidiConnection(cdp.url(), pptrTransport);
-    const bidiServer = await BidiMapper.BidiServer.createAndStart(transportBiDi, cdpConnectionAdapter, 
-    // TODO: most likely need a little bit of refactoring
-    cdpConnectionAdapter.browserClient(), '', options, undefined, bidiServerLogger);
+    const pptrBiDiConnection = new Connection_js_1.BidiConnection(cdp.url(), pptrTransport, cdp.delay, cdp.timeout);
+    const bidiServer = await BidiMapper.BidiServer.createAndStart(transportBiDi, cdpConnectionAdapter, cdpConnectionAdapter.browserClient(), 
+    /* selfTargetId= */ '', {
+        // Override Mapper's `unhandledPromptBehavior` default value of `dismiss` to
+        // `ignore`, so that user can handle the prompt instead of just closing it.
+        unhandledPromptBehavior: {
+            default: "ignore" /* Bidi.Session.UserPromptHandlerType.Ignore */,
+        },
+        ...options,
+    }, undefined, bidiServerLogger);
     return pptrBiDiConnection;
 }
 exports.connectBidiOverCdp = connectBidiOverCdp;
@@ -112589,13 +113455,6 @@ class NoOpTransport extends BidiMapper.EventEmitter {
  * Copyright 2022 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
-    var useValue = arguments.length > 2;
-    for (var i = 0; i < initializers.length; i++) {
-        value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
-    }
-    return useValue ? value : void 0;
-};
 var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, decorators, contextIn, initializers, extraInitializers) {
     function accept(f) { if (f !== void 0 && typeof f !== "function") throw new TypeError("Function expected"); return f; }
     var kind = contextIn.kind, key = kind === "getter" ? "get" : kind === "setter" ? "set" : "value";
@@ -112623,6 +113482,13 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
     if (target) Object.defineProperty(target, contextIn.name, descriptor);
     done = true;
 };
+var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
+    var useValue = arguments.length > 2;
+    for (var i = 0; i < initializers.length; i++) {
+        value = useValue ? initializers[i].call(thisArg, value) : initializers[i].call(thisArg);
+    }
+    return useValue ? value : void 0;
+};
 var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
     if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
     return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
@@ -112641,19 +113507,18 @@ const Target_js_1 = __nccwpck_require__(77000);
  */
 let BidiBrowser = (() => {
     let _classSuper = Browser_js_1.Browser;
-    let _instanceExtraInitializers = [];
     let _private_trustedEmitter_decorators;
     let _private_trustedEmitter_initializers = [];
+    let _private_trustedEmitter_extraInitializers = [];
     let _private_trustedEmitter_descriptor;
     return class BidiBrowser extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _private_trustedEmitter_decorators = [(0, decorators_js_1.bubble)()];
-            __esDecorate(this, _private_trustedEmitter_descriptor = { get: __setFunctionName(function () { return this.#trustedEmitter_accessor_storage; }, "#trustedEmitter", "get"), set: __setFunctionName(function (value) { this.#trustedEmitter_accessor_storage = value; }, "#trustedEmitter", "set") }, _private_trustedEmitter_decorators, { kind: "accessor", name: "#trustedEmitter", static: false, private: true, access: { has: obj => #trustedEmitter in obj, get: obj => obj.#trustedEmitter, set: (obj, value) => { obj.#trustedEmitter = value; } }, metadata: _metadata }, _private_trustedEmitter_initializers, _instanceExtraInitializers);
+            __esDecorate(this, _private_trustedEmitter_descriptor = { get: __setFunctionName(function () { return this.#trustedEmitter_accessor_storage; }, "#trustedEmitter", "get"), set: __setFunctionName(function (value) { this.#trustedEmitter_accessor_storage = value; }, "#trustedEmitter", "set") }, _private_trustedEmitter_decorators, { kind: "accessor", name: "#trustedEmitter", static: false, private: true, access: { has: obj => #trustedEmitter in obj, get: obj => obj.#trustedEmitter, set: (obj, value) => { obj.#trustedEmitter = value; } }, metadata: _metadata }, _private_trustedEmitter_initializers, _private_trustedEmitter_extraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
-        protocol = (__runInitializers(this, _instanceExtraInitializers), 'webDriverBiDi');
-        // TODO: Update generator to include fully module
+        protocol = 'webDriverBiDi';
         static subscribeModules = [
             'browsingContext',
             'network',
@@ -112676,6 +113541,9 @@ let BidiBrowser = (() => {
             const session = await Session_js_1.Session.from(opts.connection, {
                 alwaysMatch: {
                     acceptInsecureCerts: opts.ignoreHTTPSErrors,
+                    unhandledPromptBehavior: {
+                        default: "ignore" /* Bidi.Session.UserPromptHandlerType.Ignore */,
+                    },
                     webSocketUrl: true,
                 },
             });
@@ -112689,18 +113557,20 @@ let BidiBrowser = (() => {
         #trustedEmitter_accessor_storage = __runInitializers(this, _private_trustedEmitter_initializers, new EventEmitter_js_1.EventEmitter());
         get #trustedEmitter() { return _private_trustedEmitter_descriptor.get.call(this); }
         set #trustedEmitter(value) { return _private_trustedEmitter_descriptor.set.call(this, value); }
-        #process;
+        #process = __runInitializers(this, _private_trustedEmitter_extraInitializers);
         #closeCallback;
         #browserCore;
         #defaultViewport;
         #browserContexts = new WeakMap();
         #target = new Target_js_1.BidiBrowserTarget(this);
+        #cdpConnection;
         constructor(browserCore, opts) {
             super();
             this.#process = opts.process;
             this.#closeCallback = opts.closeCallback;
             this.#browserCore = browserCore;
             this.#defaultViewport = opts.defaultViewport;
+            this.#cdpConnection = opts.cdpConnection;
         }
         #initialize() {
             // Initializing existing contexts.
@@ -112723,7 +113593,10 @@ let BidiBrowser = (() => {
             return this.#browserCore.session.capabilities.browserVersion;
         }
         get cdpSupported() {
-            return !this.#browserName.toLocaleLowerCase().includes('firefox');
+            return this.#cdpConnection !== undefined;
+        }
+        get cdpConnection() {
+            return this.#cdpConnection;
         }
         async userAgent() {
             return this.#browserCore.session.capabilities.userAgent;
@@ -112874,10 +113747,11 @@ const util_js_1 = __nccwpck_require__(78274);
  */
 async function _connectToBiDiBrowser(connectionTransport, url, options) {
     const { ignoreHTTPSErrors = false, defaultViewport = util_js_1.DEFAULT_VIEWPORT } = options;
-    const { bidiConnection, closeCallback } = await getBiDiConnection(connectionTransport, url, options);
+    const { bidiConnection, cdpConnection, closeCallback } = await getBiDiConnection(connectionTransport, url, options);
     const BiDi = await Promise.resolve().then(() => __importStar(__nccwpck_require__(/* webpackIgnore: true */ 31240)));
     const bidiBrowser = await BiDi.BidiBrowser.create({
         connection: bidiConnection,
+        cdpConnection,
         closeCallback,
         process: undefined,
         defaultViewport: defaultViewport,
@@ -112924,11 +113798,11 @@ async function getBiDiConnection(connectionTransport, url, options) {
     if (version.product.toLowerCase().includes('firefox')) {
         throw new Errors_js_1.UnsupportedOperation('Firefox is not supported in BiDi over CDP mode.');
     }
-    // TODO: use other options too.
     const bidiOverCdpConnection = await BiDi.connectBidiOverCdp(cdpConnection, {
         acceptInsecureCerts: ignoreHTTPSErrors,
     });
     return {
+        cdpConnection,
         bidiConnection: bidiOverCdpConnection,
         closeCallback: async () => {
             // In case of BiDi over CDP, we need to close browser via CDP.
@@ -112984,6 +113858,51 @@ var __runInitializers = (this && this.__runInitializers) || function (thisArg, i
     }
     return useValue ? value : void 0;
 };
+var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
+    if (value !== null && value !== void 0) {
+        if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
+        var dispose;
+        if (async) {
+            if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
+            dispose = value[Symbol.asyncDispose];
+        }
+        if (dispose === void 0) {
+            if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
+            dispose = value[Symbol.dispose];
+        }
+        if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        env.stack.push({ value: value, dispose: dispose, async: async });
+    }
+    else if (async) {
+        env.stack.push({ async: true });
+    }
+    return value;
+};
+var __disposeResources = (this && this.__disposeResources) || (function (SuppressedError) {
+    return function (env) {
+        function fail(e) {
+            env.error = env.hasError ? new SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
+            env.hasError = true;
+        }
+        function next() {
+            while (env.stack.length) {
+                var rec = env.stack.pop();
+                try {
+                    var result = rec.dispose && rec.dispose.call(rec.value);
+                    if (rec.async) return Promise.resolve(result).then(next, function(e) { fail(e); return next(); });
+                }
+                catch (e) {
+                    fail(e);
+                }
+            }
+            if (env.hasError) throw env.error;
+        }
+        return next();
+    };
+})(typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+});
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BidiBrowserContext = void 0;
 const Browser_js_1 = __nccwpck_require__(23469);
@@ -113000,14 +113919,14 @@ const Target_js_2 = __nccwpck_require__(77000);
  */
 let BidiBrowserContext = (() => {
     let _classSuper = BrowserContext_js_1.BrowserContext;
-    let _instanceExtraInitializers = [];
     let _trustedEmitter_decorators;
     let _trustedEmitter_initializers = [];
+    let _trustedEmitter_extraInitializers = [];
     return class BidiBrowserContext extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _trustedEmitter_decorators = [(0, decorators_js_1.bubble)()];
-            __esDecorate(this, null, _trustedEmitter_decorators, { kind: "accessor", name: "trustedEmitter", static: false, private: false, access: { has: obj => "trustedEmitter" in obj, get: obj => obj.trustedEmitter, set: (obj, value) => { obj.trustedEmitter = value; } }, metadata: _metadata }, _trustedEmitter_initializers, _instanceExtraInitializers);
+            __esDecorate(this, null, _trustedEmitter_decorators, { kind: "accessor", name: "trustedEmitter", static: false, private: false, access: { has: obj => "trustedEmitter" in obj, get: obj => obj.trustedEmitter, set: (obj, value) => { obj.trustedEmitter = value; } }, metadata: _metadata }, _trustedEmitter_initializers, _trustedEmitter_extraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         static from(browser, userContext, options) {
@@ -113015,10 +113934,10 @@ let BidiBrowserContext = (() => {
             context.#initialize();
             return context;
         }
-        #trustedEmitter_accessor_storage = (__runInitializers(this, _instanceExtraInitializers), __runInitializers(this, _trustedEmitter_initializers, new EventEmitter_js_1.EventEmitter()));
+        #trustedEmitter_accessor_storage = __runInitializers(this, _trustedEmitter_initializers, new EventEmitter_js_1.EventEmitter());
         get trustedEmitter() { return this.#trustedEmitter_accessor_storage; }
         set trustedEmitter(value) { this.#trustedEmitter_accessor_storage = value; }
-        #browser;
+        #browser = __runInitializers(this, _trustedEmitter_extraInitializers);
         #defaultViewport;
         // This is public because of cookies.
         userContext;
@@ -113037,7 +113956,20 @@ let BidiBrowserContext = (() => {
                 this.#createPage(browsingContext);
             }
             this.userContext.on('browsingcontext', ({ browsingContext }) => {
-                this.#createPage(browsingContext);
+                const page = this.#createPage(browsingContext);
+                // We need to wait for the DOMContentLoaded as the
+                // browsingContext still may be navigating from the about:blank
+                browsingContext.once('DOMContentLoaded', () => {
+                    if (browsingContext.originalOpener) {
+                        for (const context of this.userContext.browsingContexts) {
+                            if (context.id === browsingContext.originalOpener) {
+                                this.#pages
+                                    .get(context)
+                                    .trustedEmitter.emit("popup" /* PageEvent.Popup */, page);
+                            }
+                        }
+                    }
+                });
             });
             this.userContext.on('closed', () => {
                 this.trustedEmitter.removeAllListeners();
@@ -113108,20 +114040,31 @@ let BidiBrowserContext = (() => {
             });
         }
         async newPage() {
-            const context = await this.userContext.createBrowsingContext("tab" /* Bidi.BrowsingContext.CreateType.Tab */);
-            const page = this.#pages.get(context);
-            if (!page) {
-                throw new Error('Page is not found');
-            }
-            if (this.#defaultViewport) {
-                try {
-                    await page.setViewport(this.#defaultViewport);
+            const env_1 = { stack: [], error: void 0, hasError: false };
+            try {
+                const _guard = __addDisposableResource(env_1, await this.waitForScreenshotOperations(), false);
+                const context = await this.userContext.createBrowsingContext("tab" /* Bidi.BrowsingContext.CreateType.Tab */);
+                const page = this.#pages.get(context);
+                if (!page) {
+                    throw new Error('Page is not found');
                 }
-                catch {
-                    // No support for setViewport in Firefox.
+                if (this.#defaultViewport) {
+                    try {
+                        await page.setViewport(this.#defaultViewport);
+                    }
+                    catch {
+                        // No support for setViewport in Firefox.
+                    }
                 }
+                return page;
             }
-            return page;
+            catch (e_1) {
+                env_1.error = e_1;
+                env_1.hasError = true;
+            }
+            finally {
+                __disposeResources(env_1);
+            }
         }
         async close() {
             if (!this.isIncognito()) {
@@ -113133,6 +114076,7 @@ let BidiBrowserContext = (() => {
             catch (error) {
                 (0, util_js_1.debugError)(error);
             }
+            this.#targets.clear();
         }
         browser() {
             return this.#browser;
@@ -113325,7 +114269,7 @@ class BidiConnection extends EventEmitter_js_1.EventEmitter {
         super();
         this.#url = url;
         this.#delay = delay;
-        this.#timeout = timeout ?? 180000;
+        this.#timeout = timeout ?? 180_000;
         this.#transport = transport;
         this.#transport.onmessage = this.onMessage.bind(this);
         this.#transport.onclose = this.unbind.bind(this);
@@ -113377,7 +114321,7 @@ class BidiConnection extends EventEmitter_js_1.EventEmitter {
                     if (object.id === null) {
                         break;
                     }
-                    this.#callbacks.reject(object.id, createProtocolError(object), object.message);
+                    this.#callbacks.reject(object.id, createProtocolError(object), `${object.error}: ${object.message}`);
                     return;
                 case 'event':
                     if (isCdpEvent(object)) {
@@ -113554,6 +114498,7 @@ class BidiDialog extends Dialog_js_1.Dialog {
     constructor(prompt) {
         super(prompt.info.type, prompt.info.message, prompt.info.defaultValue);
         this.#prompt = prompt;
+        this.handled = prompt.handled;
     }
     async handle(options) {
         await this.#prompt.handle({
@@ -113682,6 +114627,7 @@ var __disposeResources = (this && this.__disposeResources) || (function (Suppres
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BidiElementHandle = void 0;
 const ElementHandle_js_1 = __nccwpck_require__(33839);
+const AsyncIterableUtil_js_1 = __nccwpck_require__(96992);
 const decorators_js_1 = __nccwpck_require__(74063);
 const JSHandle_js_1 = __nccwpck_require__(41193);
 /**
@@ -113783,6 +114729,19 @@ let BidiElementHandle = (() => {
                 }
             });
             await this.frame.setFiles(this, files);
+        }
+        async *queryAXTree(name, role) {
+            const results = await this.frame.locateNodes(this, {
+                type: 'accessibility',
+                value: {
+                    role,
+                    name,
+                },
+            });
+            return yield* AsyncIterableUtil_js_1.AsyncIterableUtil.map(results, node => {
+                // TODO: maybe change ownership since the default ownership is probably none.
+                return Promise.resolve(BidiElementHandle.from(node, this.realm));
+            });
         }
     };
 })();
@@ -114051,6 +115010,11 @@ class ExposeableFunction {
                     realm.evaluate(name => {
                         delete globalThis[name];
                     }, this.name),
+                    ...frame.childFrames().map(childFrame => {
+                        return childFrame.evaluate(name => {
+                            delete globalThis[name];
+                        }, this.name);
+                    }),
                     frame.browsingContext.removePreloadScript(script),
                 ]);
             }
@@ -114075,22 +115039,6 @@ exports.ExposeableFunction = ExposeableFunction;
  * Copyright 2023 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
 var __runInitializers = (this && this.__runInitializers) || function (thisArg, initializers, value) {
     var useValue = arguments.length > 2;
     for (var i = 0; i < initializers.length; i++) {
@@ -114125,22 +115073,15 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
     if (target) Object.defineProperty(target, contextIn.name, descriptor);
     done = true;
 };
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
 var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
     if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
     return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BidiFrame = void 0;
-const Bidi = __importStar(__nccwpck_require__(40315));
 const rxjs_js_1 = __nccwpck_require__(35006);
 const Frame_js_1 = __nccwpck_require__(61797);
+const Accessibility_js_1 = __nccwpck_require__(64721);
 const ConsoleMessage_js_1 = __nccwpck_require__(81167);
 const Errors_js_1 = __nccwpck_require__(36315);
 const util_js_1 = __nccwpck_require__(78274);
@@ -114166,6 +115107,7 @@ let BidiFrame = (() => {
     let _private_waitForNetworkIdle$_decorators;
     let _private_waitForNetworkIdle$_descriptor;
     let _setFiles_decorators;
+    let _locateNodes_decorators;
     return class BidiFrame extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
@@ -114175,6 +115117,7 @@ let BidiFrame = (() => {
             _private_waitForLoad$_decorators = [Frame_js_1.throwIfDetached];
             _private_waitForNetworkIdle$_decorators = [Frame_js_1.throwIfDetached];
             _setFiles_decorators = [Frame_js_1.throwIfDetached];
+            _locateNodes_decorators = [Frame_js_1.throwIfDetached];
             __esDecorate(this, null, _goto_decorators, { kind: "method", name: "goto", static: false, private: false, access: { has: obj => "goto" in obj, get: obj => obj.goto }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setContent_decorators, { kind: "method", name: "setContent", static: false, private: false, access: { has: obj => "setContent" in obj, get: obj => obj.setContent }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _waitForNavigation_decorators, { kind: "method", name: "waitForNavigation", static: false, private: false, access: { has: obj => "waitForNavigation" in obj, get: obj => obj.waitForNavigation }, metadata: _metadata }, null, _instanceExtraInitializers);
@@ -114234,6 +115177,7 @@ let BidiFrame = (() => {
                     });
                 }, "#waitForNetworkIdle$") }, _private_waitForNetworkIdle$_decorators, { kind: "method", name: "#waitForNetworkIdle$", static: false, private: true, access: { has: obj => #waitForNetworkIdle$ in obj, get: obj => obj.#waitForNetworkIdle$ }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setFiles_decorators, { kind: "method", name: "setFiles", static: false, private: false, access: { has: obj => "setFiles" in obj, get: obj => obj.setFiles }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _locateNodes_decorators, { kind: "method", name: "locateNodes", static: false, private: false, access: { has: obj => "locateNodes" in obj, get: obj => obj.locateNodes }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         static from(parent, browsingContext) {
@@ -114241,12 +115185,13 @@ let BidiFrame = (() => {
             frame.#initialize();
             return frame;
         }
-        #parent = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #parent = __runInitializers(this, _instanceExtraInitializers);
         browsingContext;
         #frames = new WeakMap();
         realms;
         _id;
         client;
+        accessibility;
         constructor(parent, browsingContext) {
             super();
             this.#parent = parent;
@@ -114257,6 +115202,7 @@ let BidiFrame = (() => {
                 default: Realm_js_1.BidiFrameRealm.from(this.browsingContext.defaultRealm, this),
                 internal: Realm_js_1.BidiFrameRealm.from(this.browsingContext.createWindowRealm(`__puppeteer_internal_${Math.ceil(Math.random() * 10000)}`), this),
             };
+            this.accessibility = new Accessibility_js_1.Accessibility(this.realms.default);
         }
         #initialize() {
             for (const browsingContext of this.browsingContext.children) {
@@ -114435,12 +115381,14 @@ let BidiFrame = (() => {
             ]);
         }
         async waitForNavigation(options = {}) {
-            const { timeout: ms = this.timeoutSettings.navigationTimeout() } = options;
+            const { timeout: ms = this.timeoutSettings.navigationTimeout(), signal } = options;
             const frames = this.childFrames().map(frame => {
                 return frame.#detached$();
             });
             return await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.combineLatest)([
-                (0, util_js_1.fromEmitterEvent)(this.browsingContext, 'navigation').pipe((0, rxjs_js_1.switchMap)(({ navigation }) => {
+                (0, util_js_1.fromEmitterEvent)(this.browsingContext, 'navigation')
+                    .pipe((0, rxjs_js_1.first)())
+                    .pipe((0, rxjs_js_1.switchMap)(({ navigation }) => {
                     return this.#waitForLoad$(options).pipe((0, rxjs_js_1.delayWhen)(() => {
                         if (frames.length === 0) {
                             return (0, rxjs_js_1.of)(undefined);
@@ -114480,7 +115428,7 @@ let BidiFrame = (() => {
                 const lastRequest = request.lastRedirect ?? request;
                 const httpRequest = HTTPRequest_js_1.requests.get(lastRequest);
                 return httpRequest.response();
-            }), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), this.#detached$().pipe((0, rxjs_js_1.map)(() => {
+            }), (0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms), (0, util_js_1.fromAbortSignal)(signal), this.#detached$().pipe((0, rxjs_js_1.map)(() => {
                 throw new Errors_js_1.TargetCloseError('Frame detached.');
             })))));
         }
@@ -114506,19 +115454,12 @@ let BidiFrame = (() => {
             this.#exposedFunctions.delete(name);
             await exposedFunction[Symbol.asyncDispose]();
         }
-        waitForSelector(selector, options) {
-            if (selector.startsWith('aria') && !this.page().browser().cdpSupported) {
-                throw new Errors_js_1.UnsupportedOperation('ARIA selector is not supported for BiDi!');
-            }
-            return super.waitForSelector(selector, options);
-        }
         async createCDPSession() {
-            const { sessionId } = await this.client.send('Target.attachToTarget', {
-                targetId: this._id,
-                flatten: true,
-            });
-            await this.browsingContext.subscribe([Bidi.ChromiumBidi.BiDiModule.Cdp]);
-            return new CDPSession_js_1.BidiCdpSession(this, sessionId);
+            if (!this.page().browser().cdpSupported) {
+                throw new Errors_js_1.UnsupportedOperation();
+            }
+            const cdpConnection = this.page().browser().cdpConnection;
+            return await cdpConnection._createSession({ targetId: this._id });
         }
         get #waitForLoad$() { return _private_waitForLoad$_descriptor.value; }
         get #waitForNetworkIdle$() { return _private_waitForNetworkIdle$_descriptor.value; }
@@ -114526,6 +115467,11 @@ let BidiFrame = (() => {
             await this.browsingContext.setFiles(
             // SAFETY: ElementHandles are always remote references.
             element.remoteValue(), files);
+        }
+        async locateNodes(element, locator) {
+            return await this.browsingContext.locateNodes(locator, 
+            // SAFETY: ElementHandles are always remote references.
+            [element.remoteValue()]);
         }
     };
 })();
@@ -114574,18 +115520,18 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         request.#initialize();
         return request;
     }
-    #redirectBy;
+    #redirectChain;
     #response = null;
     id;
     #frame;
     #request;
-    constructor(request, frame, redirectBy) {
+    constructor(request, frame, redirect) {
         super();
         exports.requests.set(request, this);
         this.interception.enabled = request.isBlocked;
         this.#request = request;
         this.#frame = frame;
-        this.#redirectBy = redirectBy;
+        this.#redirectChain = redirect ? redirect.#redirectChain : [];
         this.id = request.id;
     }
     get client() {
@@ -114594,14 +115540,25 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     #initialize() {
         this.#request.on('redirect', request => {
             const httpRequest = _a.from(request, this.#frame, this);
+            this.#redirectChain.push(this);
+            request.once('success', () => {
+                this.#frame
+                    .page()
+                    .trustedEmitter.emit("requestfinished" /* PageEvent.RequestFinished */, httpRequest);
+            });
+            request.once('error', () => {
+                this.#frame
+                    .page()
+                    .trustedEmitter.emit("requestfailed" /* PageEvent.RequestFailed */, httpRequest);
+            });
             void httpRequest.finalizeInterceptions();
         });
         this.#request.once('success', data => {
-            this.#response = HTTPResponse_js_1.BidiHTTPResponse.from(data, this);
+            this.#response = HTTPResponse_js_1.BidiHTTPResponse.from(data, this, this.#frame.page().browser().cdpSupported);
         });
         this.#request.on('authenticate', this.#handleAuthentication);
         this.#frame.page().trustedEmitter.emit("request" /* PageEvent.Request */, this);
-        if (Object.keys(this.#extraHTTPHeaders).length) {
+        if (this.#hasInternalHeaderOverwrite) {
             this.interception.handlers.push(async () => {
                 await this.continue({
                     headers: this.headers(),
@@ -114613,22 +115570,38 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         return this.#request.url;
     }
     resourceType() {
-        throw new Errors_js_1.UnsupportedOperation();
+        if (!this.#frame.page().browser().cdpSupported) {
+            throw new Errors_js_1.UnsupportedOperation();
+        }
+        return (this.#request.resourceType || 'other').toLowerCase();
     }
     method() {
         return this.#request.method;
     }
     postData() {
-        throw new Errors_js_1.UnsupportedOperation();
+        if (!this.#frame.page().browser().cdpSupported) {
+            throw new Errors_js_1.UnsupportedOperation();
+        }
+        return this.#request.postData;
     }
     hasPostData() {
-        throw new Errors_js_1.UnsupportedOperation();
+        if (!this.#frame.page().browser().cdpSupported) {
+            throw new Errors_js_1.UnsupportedOperation();
+        }
+        return this.#request.hasPostData;
     }
     async fetchPostData() {
         throw new Errors_js_1.UnsupportedOperation();
     }
+    get #hasInternalHeaderOverwrite() {
+        return Boolean(Object.keys(this.#extraHTTPHeaders).length ||
+            Object.keys(this.#userAgentHeaders).length);
+    }
     get #extraHTTPHeaders() {
         return this.#frame?.page()._extraHTTPHeaders ?? {};
+    }
+    get #userAgentHeaders() {
+        return this.#frame?.page()._userAgentHeaders ?? {};
     }
     headers() {
         const headers = {};
@@ -114638,6 +115611,7 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         return {
             ...headers,
             ...this.#extraHTTPHeaders,
+            ...this.#userAgentHeaders,
         };
     }
     response() {
@@ -114656,25 +115630,14 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         return this.#request.initiator;
     }
     redirectChain() {
-        if (this.#redirectBy === undefined) {
-            return [];
-        }
-        const redirects = [this.#redirectBy];
-        for (const redirect of redirects) {
-            if (redirect.#redirectBy !== undefined) {
-                redirects.push(redirect.#redirectBy);
-            }
-        }
-        return redirects;
+        return this.#redirectChain.slice();
     }
     frame() {
         return this.#frame;
     }
     async continue(overrides, priority) {
         return await super.continue({
-            headers: Object.keys(this.#extraHTTPHeaders).length
-                ? this.headers()
-                : undefined,
+            headers: this.#hasInternalHeaderOverwrite ? this.headers() : undefined,
             ...overrides,
         }, priority);
     }
@@ -114707,11 +115670,10 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     }
     async _respond(response, _priority) {
         this.interception.handled = true;
-        const responseBody = response.body && response.body instanceof Uint8Array
-            ? response.body.toString('base64')
-            : response.body
-                ? btoa(response.body)
-                : undefined;
+        let parsedBody;
+        if (response.body) {
+            parsedBody = HTTPRequest_js_1.HTTPRequest.getResponse(response.body);
+        }
         const headers = getBidiHeaders(response.headers);
         const hasContentLength = headers.some(header => {
             return header.name === 'content-length';
@@ -114725,13 +115687,12 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
                 },
             });
         }
-        if (responseBody && !hasContentLength) {
-            const encoder = new TextEncoder();
+        if (parsedBody?.contentLength && !hasContentLength) {
             headers.push({
                 name: 'content-length',
                 value: {
                     type: 'string',
-                    value: String(encoder.encode(responseBody).byteLength),
+                    value: String(parsedBody.contentLength),
                 },
             });
         }
@@ -114741,10 +115702,10 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
             statusCode: status,
             headers: headers.length > 0 ? headers : undefined,
             reasonPhrase: HTTPRequest_js_1.STATUS_TEXTS[status],
-            body: responseBody
+            body: parsedBody?.base64
                 ? {
                     type: 'base64',
-                    value: responseBody,
+                    value: parsedBody?.base64,
                 }
                 : undefined,
         })
@@ -114776,6 +115737,9 @@ class BidiHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
             });
         }
     };
+    timing() {
+        return this.#request.timing();
+    }
 }
 exports.BidiHTTPRequest = BidiHTTPRequest;
 _a = BidiHTTPRequest;
@@ -114844,6 +115808,7 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BidiHTTPResponse = void 0;
 const HTTPResponse_js_1 = __nccwpck_require__(50607);
 const Errors_js_1 = __nccwpck_require__(36315);
+const SecurityDetails_js_1 = __nccwpck_require__(88762);
 const decorators_js_1 = __nccwpck_require__(74063);
 /**
  * @internal
@@ -114859,17 +115824,25 @@ let BidiHTTPResponse = (() => {
             __esDecorate(this, null, _remoteAddress_decorators, { kind: "method", name: "remoteAddress", static: false, private: false, access: { has: obj => "remoteAddress" in obj, get: obj => obj.remoteAddress }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
-        static from(data, request) {
-            const response = new BidiHTTPResponse(data, request);
+        static from(data, request, cdpSupported) {
+            const response = new BidiHTTPResponse(data, request, cdpSupported);
             response.#initialize();
             return response;
         }
-        #data = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #data = __runInitializers(this, _instanceExtraInitializers);
         #request;
-        constructor(data, request) {
+        #securityDetails;
+        #cdpSupported = false;
+        constructor(data, request, cdpSupported) {
             super();
             this.#data = data;
             this.#request = request;
+            this.#cdpSupported = cdpSupported;
+            // @ts-expect-error non-standard property.
+            const securityDetails = data['goog:securityDetails'];
+            if (cdpSupported && securityDetails) {
+                this.#securityDetails = new SecurityDetails_js_1.SecurityDetails(securityDetails);
+            }
         }
         #initialize() {
             if (this.#data.fromCache) {
@@ -114897,8 +115870,7 @@ let BidiHTTPResponse = (() => {
         }
         headers() {
             const headers = {};
-            // TODO: Remove once the Firefox implementation is compliant with https://w3c.github.io/webdriver-bidi/#get-the-response-data.
-            for (const header of this.#data.headers || []) {
+            for (const header of this.#data.headers) {
                 // TODO: How to handle Binary Headers
                 // https://w3c.github.io/webdriver-bidi/#type-network-Header
                 if (header.value.type === 'string') {
@@ -114914,8 +115886,30 @@ let BidiHTTPResponse = (() => {
             return this.#data.fromCache;
         }
         timing() {
-            // TODO: File and issue with BiDi spec
-            throw new Errors_js_1.UnsupportedOperation();
+            const bidiTiming = this.#request.timing();
+            return {
+                requestTime: bidiTiming.requestTime,
+                proxyStart: -1,
+                proxyEnd: -1,
+                dnsStart: bidiTiming.dnsStart,
+                dnsEnd: bidiTiming.dnsEnd,
+                connectStart: bidiTiming.connectStart,
+                connectEnd: bidiTiming.connectEnd,
+                sslStart: bidiTiming.tlsStart,
+                sslEnd: -1,
+                workerStart: -1,
+                workerReady: -1,
+                workerFetchStart: -1,
+                workerRespondWithSettled: -1,
+                workerRouterEvaluationStart: -1,
+                workerCacheLookupStart: -1,
+                sendStart: bidiTiming.requestStart,
+                sendEnd: -1,
+                pushStart: -1,
+                pushEnd: -1,
+                receiveHeadersStart: bidiTiming.responseStart,
+                receiveHeadersEnd: bidiTiming.responseEnd,
+            };
         }
         frame() {
             return this.#request.frame();
@@ -114924,7 +115918,10 @@ let BidiHTTPResponse = (() => {
             return false;
         }
         securityDetails() {
-            throw new Errors_js_1.UnsupportedOperation();
+            if (!this.#cdpSupported) {
+                throw new Errors_js_1.UnsupportedOperation();
+            }
+            return this.#securityDetails ?? null;
         }
         buffer() {
             throw new Errors_js_1.UnsupportedOperation();
@@ -115489,6 +116486,10 @@ class BidiTouchscreen extends Input_js_1.Touchscreen {
                     {
                         type: ActionType.PointerDown,
                         button: 0,
+                        width: 0.5 * 2, // 2 times default touch radius.
+                        height: 0.5 * 2, // 2 times default touch radius.
+                        pressure: 0.5,
+                        altitudeAngle: Math.PI / 2,
                     },
                 ],
             },
@@ -115508,6 +116509,10 @@ class BidiTouchscreen extends Input_js_1.Touchscreen {
                         x: Math.round(x),
                         y: Math.round(y),
                         origin: options.origin,
+                        width: 0.5 * 2, // 2 times default touch radius.
+                        height: 0.5 * 2, // 2 times default touch radius.
+                        pressure: 0.5,
+                        altitudeAngle: Math.PI / 2,
                     },
                 ],
             },
@@ -115711,7 +116716,6 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.BidiPage = void 0;
 const rxjs_js_1 = __nccwpck_require__(35006);
 const Page_js_1 = __nccwpck_require__(2194);
-const Accessibility_js_1 = __nccwpck_require__(64721);
 const Coverage_js_1 = __nccwpck_require__(85623);
 const EmulationManager_js_1 = __nccwpck_require__(56998);
 const Tracing_js_1 = __nccwpck_require__(94680);
@@ -115731,14 +116735,14 @@ const util_js_2 = __nccwpck_require__(49466);
  */
 let BidiPage = (() => {
     let _classSuper = Page_js_1.Page;
-    let _instanceExtraInitializers = [];
     let _trustedEmitter_decorators;
     let _trustedEmitter_initializers = [];
+    let _trustedEmitter_extraInitializers = [];
     return class BidiPage extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _trustedEmitter_decorators = [(0, decorators_js_1.bubble)()];
-            __esDecorate(this, null, _trustedEmitter_decorators, { kind: "accessor", name: "trustedEmitter", static: false, private: false, access: { has: obj => "trustedEmitter" in obj, get: obj => obj.trustedEmitter, set: (obj, value) => { obj.trustedEmitter = value; } }, metadata: _metadata }, _trustedEmitter_initializers, _instanceExtraInitializers);
+            __esDecorate(this, null, _trustedEmitter_decorators, { kind: "accessor", name: "trustedEmitter", static: false, private: false, access: { has: obj => "trustedEmitter" in obj, get: obj => obj.trustedEmitter, set: (obj, value) => { obj.trustedEmitter = value; } }, metadata: _metadata }, _trustedEmitter_initializers, _trustedEmitter_extraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         static from(browserContext, browsingContext) {
@@ -115746,20 +116750,20 @@ let BidiPage = (() => {
             page.#initialize();
             return page;
         }
-        #trustedEmitter_accessor_storage = (__runInitializers(this, _instanceExtraInitializers), __runInitializers(this, _trustedEmitter_initializers, new EventEmitter_js_1.EventEmitter()));
+        #trustedEmitter_accessor_storage = __runInitializers(this, _trustedEmitter_initializers, new EventEmitter_js_1.EventEmitter());
         get trustedEmitter() { return this.#trustedEmitter_accessor_storage; }
         set trustedEmitter(value) { this.#trustedEmitter_accessor_storage = value; }
-        #browserContext;
+        #browserContext = __runInitializers(this, _trustedEmitter_extraInitializers);
         #frame;
         #viewport = null;
         #workers = new Set();
         keyboard;
         mouse;
         touchscreen;
-        accessibility;
         tracing;
         coverage;
         #cdpEmulationManager;
+        #emulatedNetworkConditions;
         _client() {
             return this.#frame.client;
         }
@@ -115768,7 +116772,6 @@ let BidiPage = (() => {
             this.#browserContext = browserContext;
             this.#frame = Frame_js_1.BidiFrame.from(this, browsingContext);
             this.#cdpEmulationManager = new EmulationManager_js_1.EmulationManager(this.#frame.client);
-            this.accessibility = new Accessibility_js_1.Accessibility(this.#frame.client);
             this.tracing = new Tracing_js_1.Tracing(this.#frame.client);
             this.coverage = new Coverage_js_1.Coverage(this.#frame.client);
             this.keyboard = new Input_js_1.BidiKeyboard(this);
@@ -115787,12 +116790,54 @@ let BidiPage = (() => {
                 this.#workers.delete(worker);
             });
         }
+        /**
+         * @internal
+         */
+        _userAgentHeaders = {};
+        #userAgentInterception;
+        #userAgentPreloadScript;
         async setUserAgent(userAgent, userAgentMetadata) {
-            // TODO: handle CDP-specific cases such as mprach.
-            await this._client().send('Network.setUserAgentOverride', {
-                userAgent: userAgent,
-                userAgentMetadata: userAgentMetadata,
-            });
+            if (!this.#browserContext.browser().cdpSupported && userAgentMetadata) {
+                throw new Errors_js_1.UnsupportedOperation('Current Browser does not support `userAgentMetadata`');
+            }
+            else if (this.#browserContext.browser().cdpSupported &&
+                userAgentMetadata) {
+                return await this._client().send('Network.setUserAgentOverride', {
+                    userAgent: userAgent,
+                    userAgentMetadata: userAgentMetadata,
+                });
+            }
+            const enable = userAgent !== '';
+            userAgent = userAgent ?? (await this.#browserContext.browser().userAgent());
+            this._userAgentHeaders = enable
+                ? {
+                    'User-Agent': userAgent,
+                }
+                : {};
+            this.#userAgentInterception = await this.#toggleInterception(["beforeRequestSent" /* Bidi.Network.InterceptPhase.BeforeRequestSent */], this.#userAgentInterception, enable);
+            const changeUserAgent = (userAgent) => {
+                Object.defineProperty(navigator, 'userAgent', {
+                    value: userAgent,
+                });
+            };
+            const frames = [this.#frame];
+            for (const frame of frames) {
+                frames.push(...frame.childFrames());
+            }
+            if (this.#userAgentPreloadScript) {
+                await this.removeScriptToEvaluateOnNewDocument(this.#userAgentPreloadScript);
+            }
+            const [evaluateToken] = await Promise.all([
+                enable
+                    ? this.evaluateOnNewDocument(changeUserAgent, userAgent)
+                    : undefined,
+                // When we disable the UserAgent we want to
+                // evaluate the original value in all Browsing Contexts
+                frames.map(frame => {
+                    return frame.evaluate(changeUserAgent, userAgent);
+                }),
+            ]);
+            this.#userAgentPreloadScript = evaluateToken?.identifier;
         }
         async setBypassCSP(enabled) {
             // TODO: handle CDP-specific cases such as mprach.
@@ -115861,11 +116906,22 @@ let BidiPage = (() => {
             return this.#frame.detached;
         }
         async close(options) {
+            const env_2 = { stack: [], error: void 0, hasError: false };
             try {
-                await this.#frame.browsingContext.close(options?.runBeforeUnload);
+                const _guard = __addDisposableResource(env_2, await this.#browserContext.waitForScreenshotOperations(), false);
+                try {
+                    await this.#frame.browsingContext.close(options?.runBeforeUnload);
+                }
+                catch {
+                    return;
+                }
             }
-            catch {
-                return;
+            catch (e_2) {
+                env_2.error = e_2;
+                env_2.hasError = true;
+            }
+            finally {
+                __disposeResources(env_2);
             }
         }
         async reload(options = {}) {
@@ -115914,13 +116970,13 @@ let BidiPage = (() => {
         async setViewport(viewport) {
             if (!this.browser().cdpSupported) {
                 await this.#frame.browsingContext.setViewport({
-                    viewport: viewport.width && viewport.height
+                    viewport: viewport?.width && viewport?.height
                         ? {
                             width: viewport.width,
                             height: viewport.height,
                         }
                         : null,
-                    devicePixelRatio: viewport.deviceScaleFactor
+                    devicePixelRatio: viewport?.deviceScaleFactor
                         ? viewport.deviceScaleFactor
                         : null,
                 });
@@ -116040,6 +117096,10 @@ let BidiPage = (() => {
             return false;
         }
         async setCacheEnabled(enabled) {
+            if (!this.#browserContext.browser().cdpSupported) {
+                await this.#frame.browsingContext.setCacheBehavior(enabled ? 'default' : 'bypass');
+                return;
+            }
             // TODO: handle CDP-specific cases such as mprach.
             await this._client().send('Network.setCacheDisabled', {
                 cacheDisabled: !enabled,
@@ -116117,11 +117177,54 @@ let BidiPage = (() => {
         setBypassServiceWorker() {
             throw new Errors_js_1.UnsupportedOperation();
         }
-        setOfflineMode() {
-            throw new Errors_js_1.UnsupportedOperation();
+        async setOfflineMode(enabled) {
+            if (!this.#browserContext.browser().cdpSupported) {
+                throw new Errors_js_1.UnsupportedOperation();
+            }
+            if (!this.#emulatedNetworkConditions) {
+                this.#emulatedNetworkConditions = {
+                    offline: false,
+                    upload: -1,
+                    download: -1,
+                    latency: 0,
+                };
+            }
+            this.#emulatedNetworkConditions.offline = enabled;
+            return await this.#applyNetworkConditions();
         }
-        emulateNetworkConditions() {
-            throw new Errors_js_1.UnsupportedOperation();
+        async emulateNetworkConditions(networkConditions) {
+            if (!this.#browserContext.browser().cdpSupported) {
+                throw new Errors_js_1.UnsupportedOperation();
+            }
+            if (!this.#emulatedNetworkConditions) {
+                this.#emulatedNetworkConditions = {
+                    offline: false,
+                    upload: -1,
+                    download: -1,
+                    latency: 0,
+                };
+            }
+            this.#emulatedNetworkConditions.upload = networkConditions
+                ? networkConditions.upload
+                : -1;
+            this.#emulatedNetworkConditions.download = networkConditions
+                ? networkConditions.download
+                : -1;
+            this.#emulatedNetworkConditions.latency = networkConditions
+                ? networkConditions.latency
+                : 0;
+            return await this.#applyNetworkConditions();
+        }
+        async #applyNetworkConditions() {
+            if (!this.#emulatedNetworkConditions) {
+                return;
+            }
+            await this._client().send('Network.emulateNetworkConditions', {
+                offline: this.#emulatedNetworkConditions.offline,
+                latency: this.#emulatedNetworkConditions.latency,
+                uploadThroughput: this.#emulatedNetworkConditions.upload,
+                downloadThroughput: this.#emulatedNetworkConditions.download,
+            });
         }
         async setCookie(...cookies) {
             const pageURL = this.url();
@@ -116402,6 +117505,7 @@ class BidiRealm extends Realm_js_1.Realm {
     initialize() {
         this.realm.on('destroyed', ({ reason }) => {
             this.taskManager.terminateAll(new Error(reason));
+            this.dispose();
         });
         this.realm.on('updated', () => {
             this.internalPuppeteerUtil = undefined;
@@ -116459,11 +117563,17 @@ class BidiRealm extends Realm_js_1.Realm {
                 : `${functionDeclaration}\n${sourceUrlComment}\n`;
             responsePromise = this.realm.callFunction(functionDeclaration, 
             /* awaitPromise= */ true, {
-                arguments: args.length
+                // LazyArgs are used only internally and should not affect the order
+                // evaluate calls for the public APIs.
+                arguments: args.some(arg => {
+                    return arg instanceof LazyArg_js_1.LazyArg;
+                })
                     ? await Promise.all(args.map(arg => {
-                        return this.serialize(arg);
+                        return this.serializeAsync(arg);
                     }))
-                    : [],
+                    : args.map(arg => {
+                        return this.serialize(arg);
+                    }),
                 resultOwnership,
                 userActivation: true,
                 serializationOptions,
@@ -116484,10 +117594,13 @@ class BidiRealm extends Realm_js_1.Realm {
         }
         return JSHandle_js_1.BidiJSHandle.from(result, this);
     }
-    async serialize(arg) {
+    async serializeAsync(arg) {
         if (arg instanceof LazyArg_js_1.LazyArg) {
             arg = await arg.get(this);
         }
+        return this.serialize(arg);
+    }
+    serialize(arg) {
         if (arg instanceof JSHandle_js_1.BidiJSHandle || arg instanceof ElementHandle_js_1.BidiElementHandle) {
             if (arg.realm !== this) {
                 if (!(arg.realm instanceof BidiFrameRealm) ||
@@ -116506,6 +117619,9 @@ class BidiRealm extends Realm_js_1.Realm {
         return Serializer_js_1.BidiSerializer.serialize(arg);
     }
     async destroyHandles(handles) {
+        if (this.disposed) {
+            return;
+        }
         const handleIds = handles
             .map(({ id }) => {
             return id;
@@ -116760,7 +117876,7 @@ class BidiSerializer {
                 value: arg.toISOString(),
             };
         }
-        throw new UnserializableError('Custom object sterilization not possible. Use plain objects instead.');
+        throw new UnserializableError('Custom object serialization not possible. Use plain objects instead.');
     }
 }
 exports.BidiSerializer = BidiSerializer;
@@ -117363,6 +118479,7 @@ let BrowsingContext = (() => {
     let _traverseHistory_decorators;
     let _navigate_decorators;
     let _reload_decorators;
+    let _setCacheBehavior_decorators;
     let _print_decorators;
     let _handleUserPrompt_decorators;
     let _setViewport_decorators;
@@ -117378,10 +118495,15 @@ let BrowsingContext = (() => {
     let _subscribe_decorators;
     let _addInterception_decorators;
     let _deleteCookie_decorators;
+    let _locateNodes_decorators;
     return class BrowsingContext extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
             _deleteCookie_decorators = [(0, decorators_js_1.throwIfDisposed)(context => {
+                    // SAFETY: Disposal implies this exists.
+                    return context.#reason;
+                })];
+            _locateNodes_decorators = [(0, decorators_js_1.throwIfDisposed)(context => {
                     // SAFETY: Disposal implies this exists.
                     return context.#reason;
                 })];
@@ -117392,6 +118514,7 @@ let BrowsingContext = (() => {
             __esDecorate(this, null, _traverseHistory_decorators, { kind: "method", name: "traverseHistory", static: false, private: false, access: { has: obj => "traverseHistory" in obj, get: obj => obj.traverseHistory }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _navigate_decorators, { kind: "method", name: "navigate", static: false, private: false, access: { has: obj => "navigate" in obj, get: obj => obj.navigate }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _reload_decorators, { kind: "method", name: "reload", static: false, private: false, access: { has: obj => "reload" in obj, get: obj => obj.reload }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _setCacheBehavior_decorators, { kind: "method", name: "setCacheBehavior", static: false, private: false, access: { has: obj => "setCacheBehavior" in obj, get: obj => obj.setCacheBehavior }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _print_decorators, { kind: "method", name: "print", static: false, private: false, access: { has: obj => "print" in obj, get: obj => obj.print }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _handleUserPrompt_decorators, { kind: "method", name: "handleUserPrompt", static: false, private: false, access: { has: obj => "handleUserPrompt" in obj, get: obj => obj.handleUserPrompt }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setViewport_decorators, { kind: "method", name: "setViewport", static: false, private: false, access: { has: obj => "setViewport" in obj, get: obj => obj.setViewport }, metadata: _metadata }, null, _instanceExtraInitializers);
@@ -117407,14 +118530,15 @@ let BrowsingContext = (() => {
             __esDecorate(this, null, _subscribe_decorators, { kind: "method", name: "subscribe", static: false, private: false, access: { has: obj => "subscribe" in obj, get: obj => obj.subscribe }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _addInterception_decorators, { kind: "method", name: "addInterception", static: false, private: false, access: { has: obj => "addInterception" in obj, get: obj => obj.addInterception }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _deleteCookie_decorators, { kind: "method", name: "deleteCookie", static: false, private: false, access: { has: obj => "deleteCookie" in obj, get: obj => obj.deleteCookie }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _locateNodes_decorators, { kind: "method", name: "locateNodes", static: false, private: false, access: { has: obj => "locateNodes" in obj, get: obj => obj.locateNodes }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
-        static from(userContext, parent, id, url) {
-            const browsingContext = new BrowsingContext(userContext, parent, id, url);
+        static from(userContext, parent, id, url, originalOpener) {
+            const browsingContext = new BrowsingContext(userContext, parent, id, url, originalOpener);
             browsingContext.#initialize();
             return browsingContext;
         }
-        #navigation = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #navigation = __runInitializers(this, _instanceExtraInitializers);
         #reason;
         #url;
         #children = new Map();
@@ -117425,12 +118549,14 @@ let BrowsingContext = (() => {
         id;
         parent;
         userContext;
-        constructor(context, parent, id, url) {
+        originalOpener;
+        constructor(context, parent, id, url, originalOpener) {
             super();
             this.#url = url;
             this.id = id;
             this.parent = parent;
             this.userContext = context;
+            this.originalOpener = originalOpener;
             this.defaultRealm = this.#createWindowRealm();
         }
         #initialize() {
@@ -117443,7 +118569,7 @@ let BrowsingContext = (() => {
                 if (info.parent !== this.id) {
                     return;
                 }
-                const browsingContext = BrowsingContext.from(this.userContext, this, info.context, info.url);
+                const browsingContext = BrowsingContext.from(this.userContext, this, info.context, info.url, info.originalOpener);
                 this.#children.set(info.context, browsingContext);
                 const browsingContextEmitter = this.#disposables.use(new EventEmitter_js_1.EventEmitter(browsingContext));
                 browsingContextEmitter.once('closed', () => {
@@ -117476,7 +118602,8 @@ let BrowsingContext = (() => {
                 if (info.context !== this.id) {
                     return;
                 }
-                this.#url = info.url;
+                // Note: we should not update this.#url at this point since the context
+                // has not finished navigating to the info.url yet.
                 for (const [id, request] of this.#requests) {
                     if (request.disposed) {
                         this.#requests.delete(id);
@@ -117502,8 +118629,9 @@ let BrowsingContext = (() => {
                 if (event.context !== this.id) {
                     return;
                 }
-                if (event.redirectCount !== 0) {
+                if (this.#requests.has(event.request.request)) {
                     // Means the request is a redirect. This is handled in Request.
+                    // Or an Auth event was issued
                     return;
                 }
                 const request = Request_js_1.Request.from(this, event);
@@ -117605,6 +118733,13 @@ let BrowsingContext = (() => {
                 ...options,
             });
         }
+        async setCacheBehavior(cacheBehavior) {
+            // @ts-expect-error not in BiDi types yet.
+            await this.#session.send('network.setCacheBehavior', {
+                contexts: [this.id],
+                cacheBehavior,
+            });
+        }
         async print(options = {}) {
             const { result: { data }, } = await this.#session.send('browsingContext.print', {
                 context: this.id,
@@ -117704,6 +118839,9 @@ let BrowsingContext = (() => {
             })], _reload_decorators = [(0, decorators_js_1.throwIfDisposed)(context => {
                 // SAFETY: Disposal implies this exists.
                 return context.#reason;
+            })], _setCacheBehavior_decorators = [(0, decorators_js_1.throwIfDisposed)(context => {
+                // SAFETY: Disposal implies this exists.
+                return context.#reason;
             })], _print_decorators = [(0, decorators_js_1.throwIfDisposed)(context => {
                 // SAFETY: Disposal implies this exists.
                 return context.#reason;
@@ -117763,6 +118901,15 @@ let BrowsingContext = (() => {
                     },
                 });
             }));
+        }
+        async locateNodes(locator, startNodes) {
+            // TODO: add other locateNodes options if needed.
+            const result = await this.#session.send('browsingContext.locateNodes', {
+                context: this.id,
+                locator,
+                startNodes: startNodes.length ? startNodes : undefined,
+            });
+            return result.result.nodes;
         }
     };
 })();
@@ -117839,7 +118986,7 @@ let Navigation = (() => {
             navigation.#initialize();
             return navigation;
         }
-        #request = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #request = __runInitializers(this, _instanceExtraInitializers);
         #navigation;
         #browsingContext;
         #disposables = new disposable_js_1.DisposableStack();
@@ -118019,7 +119166,7 @@ let Realm = (() => {
             __esDecorate(this, null, _resolveExecutionContextId_decorators, { kind: "method", name: "resolveExecutionContextId", static: false, private: false, access: { has: obj => "resolveExecutionContextId" in obj, get: obj => obj.resolveExecutionContextId }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
-        #reason = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #reason = __runInitializers(this, _instanceExtraInitializers);
         disposables = new disposable_js_1.DisposableStack();
         id;
         origin;
@@ -118313,7 +119460,7 @@ let Request = (() => {
             request.#initialize();
             return request;
         }
-        #error = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #error = __runInitializers(this, _instanceExtraInitializers);
         #redirect;
         #response;
         #browsingContext;
@@ -118368,6 +119515,7 @@ let Request = (() => {
                     return;
                 }
                 this.#response = event.response;
+                this.#event.request.timings = event.request.timings;
                 this.emit('success', this.#response);
                 // In case this is a redirect.
                 if (this.#response.status >= 300 && this.#response.status < 400) {
@@ -118422,6 +119570,18 @@ let Request = (() => {
         get isBlocked() {
             return this.#event.isBlocked;
         }
+        get resourceType() {
+            // @ts-expect-error non-standard attribute.
+            return this.#event.request['goog:resourceType'] ?? undefined;
+        }
+        get postData() {
+            // @ts-expect-error non-standard attribute.
+            return this.#event.request['goog:postData'] ?? undefined;
+        }
+        get hasPostData() {
+            // @ts-expect-error non-standard attribute.
+            return this.#event.request['goog:hasPostData'] ?? false;
+        }
         async continueRequest({ url, method, headers, cookies, body, }) {
             await this.#session.send('network.continueRequest', {
                 request: this.id,
@@ -118467,6 +119627,9 @@ let Request = (() => {
         [(_dispose_decorators = [decorators_js_1.inertIfDisposed], disposable_js_1.disposeSymbol)]() {
             this.#disposables.dispose();
             super[disposable_js_1.disposeSymbol]();
+        }
+        timing() {
+            return this.#event.request.timings;
         }
     };
 })();
@@ -118522,12 +119685,9 @@ var __esDecorate = (this && this.__esDecorate) || function (ctor, descriptorIn, 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.Session = void 0;
 const EventEmitter_js_1 = __nccwpck_require__(7692);
-const util_js_1 = __nccwpck_require__(78274);
 const decorators_js_1 = __nccwpck_require__(74063);
 const disposable_js_1 = __nccwpck_require__(97805);
 const Browser_js_1 = __nccwpck_require__(71657);
-// TODO: Once Chrome supports session.status properly, uncomment this block.
-// const MAX_RETRIES = 5;
 /**
  * @internal
  */
@@ -118536,6 +119696,7 @@ let Session = (() => {
     let _instanceExtraInitializers = [];
     let _connection_decorators;
     let _connection_initializers = [];
+    let _connection_extraInitializers = [];
     let _dispose_decorators;
     let _send_decorators;
     let _subscribe_decorators;
@@ -118544,7 +119705,7 @@ let Session = (() => {
     return class Session extends _classSuper {
         static {
             const _metadata = typeof Symbol === "function" && Symbol.metadata ? Object.create(_classSuper[Symbol.metadata] ?? null) : void 0;
-            __esDecorate(this, null, _connection_decorators, { kind: "accessor", name: "connection", static: false, private: false, access: { has: obj => "connection" in obj, get: obj => obj.connection, set: (obj, value) => { obj.connection = value; } }, metadata: _metadata }, _connection_initializers, _instanceExtraInitializers);
+            __esDecorate(this, null, _connection_decorators, { kind: "accessor", name: "connection", static: false, private: false, access: { has: obj => "connection" in obj, get: obj => obj.connection, set: (obj, value) => { obj.connection = value; } }, metadata: _metadata }, _connection_initializers, _connection_extraInitializers);
             __esDecorate(this, null, _dispose_decorators, { kind: "method", name: "dispose", static: false, private: false, access: { has: obj => "dispose" in obj, get: obj => obj.dispose }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _send_decorators, { kind: "method", name: "send", static: false, private: false, access: { has: obj => "send" in obj, get: obj => obj.send }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _subscribe_decorators, { kind: "method", name: "subscribe", static: false, private: false, access: { has: obj => "subscribe" in obj, get: obj => obj.subscribe }, metadata: _metadata }, null, _instanceExtraInitializers);
@@ -118553,51 +119714,14 @@ let Session = (() => {
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         static async from(connection, capabilities) {
-            // Wait until the session is ready.
-            //
-            // TODO: Once Chrome supports session.status properly, uncomment this block
-            // and remove `getBiDiConnection` in BrowserConnector.
-            // let status = {message: '', ready: false};
-            // for (let i = 0; i < MAX_RETRIES; ++i) {
-            //   status = (await connection.send('session.status', {})).result;
-            //   if (status.ready) {
-            //     break;
-            //   }
-            //   // Backoff a little bit each time.
-            //   await new Promise(resolve => {
-            //     return setTimeout(resolve, (1 << i) * 100);
-            //   });
-            // }
-            // if (!status.ready) {
-            //   throw new Error(status.message);
-            // }
-            let result;
-            try {
-                result = (await connection.send('session.new', {
-                    capabilities,
-                })).result;
-            }
-            catch (err) {
-                // Chrome does not support session.new.
-                (0, util_js_1.debugError)(err);
-                result = {
-                    sessionId: '',
-                    capabilities: {
-                        acceptInsecureCerts: false,
-                        browserName: '',
-                        browserVersion: '',
-                        platformName: '',
-                        setWindowRect: false,
-                        webSocketUrl: '',
-                        userAgent: '',
-                    },
-                };
-            }
+            const { result } = await connection.send('session.new', {
+                capabilities,
+            });
             const session = new Session(connection, result);
             await session.#initialize();
             return session;
         }
-        #reason = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #reason = __runInitializers(this, _instanceExtraInitializers);
         #disposables = new disposable_js_1.DisposableStack();
         #info;
         browser;
@@ -118606,6 +119730,7 @@ let Session = (() => {
         set connection(value) { this.#connection_accessor_storage = value; }
         constructor(connection, info) {
             super();
+            __runInitializers(this, _connection_extraInitializers);
             this.#info = info;
             this.connection = connection;
         }
@@ -118781,7 +119906,7 @@ let UserContext = (() => {
             context.#initialize();
             return context;
         }
-        #reason = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #reason = __runInitializers(this, _instanceExtraInitializers);
         // Note these are only top-level contexts.
         #browsingContexts = new Map();
         #disposables = new disposable_js_1.DisposableStack();
@@ -118795,7 +119920,10 @@ let UserContext = (() => {
         #initialize() {
             const browserEmitter = this.#disposables.use(new EventEmitter_js_1.EventEmitter(this.browser));
             browserEmitter.once('closed', ({ reason }) => {
-                this.dispose(`User context already closed: ${reason}`);
+                this.dispose(`User context was closed: ${reason}`);
+            });
+            browserEmitter.once('disconnected', ({ reason }) => {
+                this.dispose(`User context was closed: ${reason}`);
             });
             const sessionEmitter = this.#disposables.use(new EventEmitter_js_1.EventEmitter(this.#session));
             sessionEmitter.on('browsingContext.contextCreated', info => {
@@ -118805,7 +119933,7 @@ let UserContext = (() => {
                 if (info.userContext !== this.#id) {
                     return;
                 }
-                const browsingContext = BrowsingContext_js_1.BrowsingContext.from(this, undefined, info.context, info.url);
+                const browsingContext = BrowsingContext_js_1.BrowsingContext.from(this, undefined, info.context, info.url, info.originalOpener);
                 this.#browsingContexts.set(browsingContext.id, browsingContext);
                 const browsingContextEmitter = this.#disposables.use(new EventEmitter_js_1.EventEmitter(browsingContext));
                 browsingContextEmitter.on('closed', () => {
@@ -118983,7 +120111,7 @@ let UserPrompt = (() => {
             userPrompt.#initialize();
             return userPrompt;
         }
-        #reason = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #reason = __runInitializers(this, _instanceExtraInitializers);
         #result;
         #disposables = new disposable_js_1.DisposableStack();
         browsingContext;
@@ -119018,6 +120146,10 @@ let UserPrompt = (() => {
             return this.closed;
         }
         get handled() {
+            if (this.info.handler === "accept" /* Bidi.Session.UserPromptHandlerType.Accept */ ||
+                this.info.handler === "dismiss" /* Bidi.Session.UserPromptHandlerType.Dismiss */) {
+                return true;
+            }
             return this.#result !== undefined;
         }
         get result() {
@@ -119153,18 +120285,12 @@ exports.Accessibility = void 0;
  * @public
  */
 class Accessibility {
-    #client;
+    #realm;
     /**
      * @internal
      */
-    constructor(client) {
-        this.#client = client;
-    }
-    /**
-     * @internal
-     */
-    updateClient(client) {
-        this.#client = client;
+    constructor(realm) {
+        this.#realm = realm;
     }
     /**
      * Captures the current state of the accessibility tree.
@@ -119207,15 +120333,15 @@ class Accessibility {
      */
     async snapshot(options = {}) {
         const { interestingOnly = true, root = null } = options;
-        const { nodes } = await this.#client.send('Accessibility.getFullAXTree');
+        const { nodes } = await this.#realm.environment.client.send('Accessibility.getFullAXTree');
         let backendNodeId;
         if (root) {
-            const { node } = await this.#client.send('DOM.describeNode', {
+            const { node } = await this.#realm.environment.client.send('DOM.describeNode', {
                 objectId: root.id,
             });
             backendNodeId = node.backendNodeId;
         }
-        const defaultRoot = AXNode.createTree(nodes);
+        const defaultRoot = AXNode.createTree(this.#realm, nodes);
         let needle = defaultRoot;
         if (backendNodeId) {
             needle = defaultRoot.find(node => {
@@ -119274,11 +120400,13 @@ class AXNode {
     #role;
     #ignored;
     #cachedHasFocusableChild;
-    constructor(payload) {
+    #realm;
+    constructor(realm, payload) {
         this.payload = payload;
         this.#name = this.payload.name ? this.payload.name.value : '';
         this.#role = this.payload.role ? this.payload.role.value : 'Unknown';
         this.#ignored = this.payload.ignored;
+        this.#realm = realm;
         for (const property of this.payload.properties || []) {
             if (property.name === 'editable') {
                 this.#richlyEditable = property.value.value === 'richtext';
@@ -119435,6 +120563,12 @@ class AXNode {
         }
         const node = {
             role: this.#role,
+            elementHandle: async () => {
+                if (!this.payload.backendDOMNodeId) {
+                    return null;
+                }
+                return (await this.#realm.adoptBackendNode(this.payload.backendDOMNodeId));
+            },
         };
         const userStringProperties = [
             'name',
@@ -119521,10 +120655,10 @@ class AXNode {
         }
         return node;
     }
-    static createTree(payloads) {
+    static createTree(realm, payloads) {
         const nodeById = new Map();
         for (const payload of payloads) {
-            nodeById.set(payload.nodeId, new AXNode(payload));
+            nodeById.set(payload.nodeId, new AXNode(realm, payload));
         }
         for (const node of nodeById.values()) {
             for (const childId of node.payload.childIds || []) {
@@ -119556,26 +120690,6 @@ exports.ARIAQueryHandler = void 0;
 const QueryHandler_js_1 = __nccwpck_require__(53200);
 const assert_js_1 = __nccwpck_require__(97729);
 const AsyncIterableUtil_js_1 = __nccwpck_require__(96992);
-const NON_ELEMENT_NODE_ROLES = new Set(['StaticText', 'InlineTextBox']);
-const queryAXTree = async (client, element, accessibleName, role) => {
-    const { nodes } = await client.send('Accessibility.queryAXTree', {
-        objectId: element.id,
-        accessibleName,
-        role,
-    });
-    return nodes.filter((node) => {
-        if (node.ignored) {
-            return false;
-        }
-        if (!node.role) {
-            return false;
-        }
-        if (NON_ELEMENT_NODE_ROLES.has(node.role.value)) {
-            return false;
-        }
-        return true;
-    });
-};
 const isKnownAttribute = (attribute) => {
     return ['name', 'role'].includes(attribute);
 };
@@ -119616,10 +120730,7 @@ class ARIAQueryHandler extends QueryHandler_js_1.QueryHandler {
     };
     static async *queryAll(element, selector) {
         const { name, role } = parseARIASelector(selector);
-        const results = await queryAXTree(element.realm.environment.client, element, name, role);
-        yield* AsyncIterableUtil_js_1.AsyncIterableUtil.map(results, node => {
-            return element.realm.adoptBackendNode(node.backendDOMNodeId);
-        });
+        yield* element.queryAXTree(name, role);
     }
     static queryOne = async (element, selector) => {
         return ((await AsyncIterableUtil_js_1.AsyncIterableUtil.first(this.queryAll(element, selector))) ?? null);
@@ -119697,12 +120808,17 @@ const ErrorLike_js_1 = __nccwpck_require__(32937);
 class Binding {
     #name;
     #fn;
-    constructor(name, fn) {
+    #initSource;
+    constructor(name, fn, initSource) {
         this.#name = name;
         this.#fn = fn;
+        this.#initSource = initSource;
     }
     get name() {
         return this.#name;
+    }
+    get initSource() {
+        return this.#initSource;
     }
     /**
      * @param context - Context to run the binding in; the context should have
@@ -119815,11 +120931,15 @@ const Target_js_1 = __nccwpck_require__(13026);
 class CdpBrowser extends Browser_js_1.Browser {
     protocol = 'cdp';
     static async _create(product, connection, contextIds, ignoreHTTPSErrors, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets = true) {
-        const browser = new CdpBrowser(product, connection, contextIds, ignoreHTTPSErrors, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets);
+        const browser = new CdpBrowser(product, connection, contextIds, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets);
+        if (ignoreHTTPSErrors) {
+            await connection.send('Security.setIgnoreCertificateErrors', {
+                ignore: true,
+            });
+        }
         await browser._attach();
         return browser;
     }
-    #ignoreHTTPSErrors;
     #defaultViewport;
     #process;
     #connection;
@@ -119829,14 +120949,13 @@ class CdpBrowser extends Browser_js_1.Browser {
     #defaultContext;
     #contexts = new Map();
     #targetManager;
-    constructor(product, connection, contextIds, ignoreHTTPSErrors, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets = true) {
+    constructor(product, connection, contextIds, defaultViewport, process, closeCallback, targetFilterCallback, isPageTargetCallback, waitForInitiallyDiscoveredTargets = true) {
         super();
         product = product || 'chrome';
-        this.#ignoreHTTPSErrors = ignoreHTTPSErrors;
         this.#defaultViewport = defaultViewport;
         this.#process = process;
         this.#connection = connection;
-        this.#closeCallback = closeCallback || function () { };
+        this.#closeCallback = closeCallback || (() => { });
         this.#targetFilterCallback =
             targetFilterCallback ||
                 (() => {
@@ -119928,10 +121047,10 @@ class CdpBrowser extends Browser_js_1.Browser {
         };
         const otherTarget = new Target_js_1.OtherTarget(targetInfo, session, context, this.#targetManager, createSession);
         if (targetInfo.url?.startsWith('devtools://')) {
-            return new Target_js_1.DevToolsTarget(targetInfo, session, context, this.#targetManager, createSession, this.#ignoreHTTPSErrors, this.#defaultViewport ?? null);
+            return new Target_js_1.DevToolsTarget(targetInfo, session, context, this.#targetManager, createSession, this.#defaultViewport ?? null);
         }
         if (this.#isPageTargetCallback(otherTarget)) {
-            return new Target_js_1.PageTarget(targetInfo, session, context, this.#targetManager, createSession, this.#ignoreHTTPSErrors, this.#defaultViewport ?? null);
+            return new Target_js_1.PageTarget(targetInfo, session, context, this.#targetManager, createSession, this.#defaultViewport ?? null);
         }
         if (targetInfo.type === 'service_worker' ||
             targetInfo.type === 'shared_worker') {
@@ -120082,7 +121201,7 @@ exports._connectToCdpBrowser = _connectToCdpBrowser;
 /***/ }),
 
 /***/ 53915:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
@@ -120091,6 +121210,51 @@ exports._connectToCdpBrowser = _connectToCdpBrowser;
  * Copyright 2024 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
+var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
+    if (value !== null && value !== void 0) {
+        if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
+        var dispose;
+        if (async) {
+            if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
+            dispose = value[Symbol.asyncDispose];
+        }
+        if (dispose === void 0) {
+            if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
+            dispose = value[Symbol.dispose];
+        }
+        if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        env.stack.push({ value: value, dispose: dispose, async: async });
+    }
+    else if (async) {
+        env.stack.push({ async: true });
+    }
+    return value;
+};
+var __disposeResources = (this && this.__disposeResources) || (function (SuppressedError) {
+    return function (env) {
+        function fail(e) {
+            env.error = env.hasError ? new SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
+            env.hasError = true;
+        }
+        function next() {
+            while (env.stack.length) {
+                var rec = env.stack.pop();
+                try {
+                    var result = rec.dispose && rec.dispose.call(rec.value);
+                    if (rec.async) return Promise.resolve(result).then(next, function(e) { fail(e); return next(); });
+                }
+                catch (e) {
+                    fail(e);
+                }
+            }
+            if (env.hasError) throw env.error;
+        }
+        return next();
+    };
+})(typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+});
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CdpBrowserContext = void 0;
 const Browser_js_1 = __nccwpck_require__(23469);
@@ -120153,8 +121317,19 @@ class CdpBrowserContext extends BrowserContext_js_1.BrowserContext {
             browserContextId: this.#id || undefined,
         });
     }
-    newPage() {
-        return this.#browser._createPageInContext(this.#id);
+    async newPage() {
+        const env_1 = { stack: [], error: void 0, hasError: false };
+        try {
+            const _guard = __addDisposableResource(env_1, await this.waitForScreenshotOperations(), false);
+            return await this.#browser._createPageInContext(this.#id);
+        }
+        catch (e_1) {
+            env_1.error = e_1;
+            env_1.hasError = true;
+        }
+        finally {
+            __disposeResources(env_1);
+        }
     }
     browser() {
         return this.#browser;
@@ -120295,6 +121470,56 @@ exports.CdpCDPSession = CdpCDPSession;
 
 /***/ }),
 
+/***/ 61644:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+/**
+ * @license
+ * Copyright 2024 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.CdpPreloadScript = void 0;
+/**
+ * @internal
+ */
+class CdpPreloadScript {
+    /**
+     * This is the ID of the preload script returned by
+     * Page.addScriptToEvaluateOnNewDocument in the main frame.
+     *
+     * Sub-frames would get a different CDP ID because
+     * addScriptToEvaluateOnNewDocument is called for each subframe. But
+     * users only see this ID and subframe IDs are internal to Puppeteer.
+     */
+    #id;
+    #source;
+    #frameToId = new WeakMap();
+    constructor(mainFrame, id, source) {
+        this.#id = id;
+        this.#source = source;
+        this.#frameToId.set(mainFrame, id);
+    }
+    get id() {
+        return this.#id;
+    }
+    get source() {
+        return this.#source;
+    }
+    getIdForFrame(frame) {
+        return this.#frameToId.get(frame);
+    }
+    setIdForFrame(frame, identifier) {
+        this.#frameToId.set(frame, identifier);
+    }
+}
+exports.CdpPreloadScript = CdpPreloadScript;
+//# sourceMappingURL=CdpPreloadScript.js.map
+
+/***/ }),
+
 /***/ 29343:
 /***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
@@ -120376,9 +121601,14 @@ class ChromeTargetManager extends EventEmitter_js_1.EventEmitter {
         }
         for (const [targetId, targetInfo,] of this.#discoveredTargetsByTargetId.entries()) {
             const targetForFilter = new Target_js_1.CdpTarget(targetInfo, undefined, undefined, this, undefined);
+            // Targets from extensions and the browser that will not be
+            // auto-attached. Therefore, we should not add them to
+            // #targetsIdsForInit.
+            const skipTarget = targetInfo.type === 'browser' ||
+                targetInfo.url.startsWith('chrome-extension://');
             if ((!this.#targetFilterCallback ||
                 this.#targetFilterCallback(targetForFilter)) &&
-                targetInfo.type !== 'browser') {
+                !skipTarget) {
                 this.#targetsIdsForInit.add(targetId);
             }
         }
@@ -120403,6 +121633,9 @@ class ChromeTargetManager extends EventEmitter_js_1.EventEmitter {
         });
         this.#finishInitializationIfReady();
         await this.#initializeDeferred.valueOrThrow();
+    }
+    getChildTargets(target) {
+        return target._childTargets();
     }
     dispose() {
         this.#connection.off('Target.targetCreated', this.#onTargetCreated);
@@ -120557,6 +121790,10 @@ class ChromeTargetManager extends EventEmitter_js_1.EventEmitter {
             this.#attachedTargetsByTargetId.set(targetInfo.targetId, target);
             this.#attachedTargetsBySessionId.set(session.id(), target);
         }
+        const parentTarget = parentSession instanceof CDPSession_js_1.CDPSession
+            ? parentSession._target()
+            : null;
+        parentTarget?._addChildTarget(target);
         parentSession.emit(CDPSession_js_1.CDPSessionEvent.Ready, session);
         this.#targetsIdsForInit.delete(target._targetId);
         if (!isExistingTarget) {
@@ -120581,11 +121818,14 @@ class ChromeTargetManager extends EventEmitter_js_1.EventEmitter {
             this.#initializeDeferred.resolve();
         }
     }
-    #onDetachedFromTarget = (_parentSession, event) => {
+    #onDetachedFromTarget = (parentSession, event) => {
         const target = this.#attachedTargetsBySessionId.get(event.sessionId);
         this.#attachedTargetsBySessionId.delete(event.sessionId);
         if (!target) {
             return;
+        }
+        if (parentSession instanceof CDPSession_js_1.CDPSession) {
+            parentSession._target()._removeChildTarget(target);
         }
         this.#attachedTargetsByTargetId.delete(target._targetId);
         this.emit("targetGone" /* TargetManagerEvent.TargetGone */, target);
@@ -120633,13 +121873,19 @@ class Connection extends EventEmitter_js_1.EventEmitter {
         super();
         this.#url = url;
         this.#delay = delay;
-        this.#timeout = timeout ?? 180000;
+        this.#timeout = timeout ?? 180_000;
         this.#transport = transport;
         this.#transport.onmessage = this.onMessage.bind(this);
         this.#transport.onclose = this.#onClose.bind(this);
     }
     static fromSession(session) {
         return session.connection();
+    }
+    /**
+     * @internal
+     */
+    get delay() {
+        return this.#delay;
     }
     get timeout() {
         return this.#timeout;
@@ -120679,6 +121925,9 @@ class Connection extends EventEmitter_js_1.EventEmitter {
      * @internal
      */
     _rawSend(callbacks, method, params, sessionId, options) {
+        if (this.#closed) {
+            return Promise.reject(new Error('Protocol error: Connection closed.'));
+        }
         return callbacks.create(method, options?.timeout ?? this.#timeout, id => {
             const stringifiedMessage = JSON.stringify({
                 method,
@@ -120876,6 +122125,9 @@ const disposable_js_1 = __nccwpck_require__(97805);
 class Coverage {
     #jsCoverage;
     #cssCoverage;
+    /**
+     * @internal
+     */
     constructor(client) {
         this.#jsCoverage = new JSCoverage(client);
         this.#cssCoverage = new CSSCoverage(client);
@@ -120947,6 +122199,9 @@ class JSCoverage {
     #resetOnNavigation = false;
     #reportAnonymousScripts = false;
     #includeRawScriptCoverage = false;
+    /**
+     * @internal
+     */
     constructor(client) {
         this.#client = client;
     }
@@ -121247,7 +122502,7 @@ exports.DeviceRequestPromptDevice = DeviceRequestPromptDevice;
  * @example
  *
  * ```ts
- * const [deviceRequest] = Promise.all([
+ * const [devicePrompt] = Promise.all([
  *   page.waitForDevicePrompt(),
  *   page.click('#connect-bluetooth'),
  * ]);
@@ -121524,8 +122779,10 @@ exports.CdpElementHandle = void 0;
 const ElementHandle_js_1 = __nccwpck_require__(33839);
 const util_js_1 = __nccwpck_require__(78274);
 const assert_js_1 = __nccwpck_require__(97729);
+const AsyncIterableUtil_js_1 = __nccwpck_require__(96992);
 const decorators_js_1 = __nccwpck_require__(74063);
 const JSHandle_js_1 = __nccwpck_require__(85326);
+const NON_ELEMENT_NODE_ROLES = new Set(['StaticText', 'InlineTextBox']);
 /**
  * The CdpElementHandle extends ElementHandle now to keep compatibility
  * with `instanceof` because of that we need to have methods for
@@ -121656,6 +122913,28 @@ let CdpElementHandle = (() => {
                 card: data.creditCard,
             });
         }
+        async *queryAXTree(name, role) {
+            const { nodes } = await this.client.send('Accessibility.queryAXTree', {
+                objectId: this.id,
+                accessibleName: name,
+                role,
+            });
+            const results = nodes.filter(node => {
+                if (node.ignored) {
+                    return false;
+                }
+                if (!node.role) {
+                    return false;
+                }
+                if (NON_ELEMENT_NODE_ROLES.has(node.role.value)) {
+                    return false;
+                }
+                return true;
+            });
+            return yield* AsyncIterableUtil_js_1.AsyncIterableUtil.map(results, node => {
+                return this.realm.adoptBackendNode(node.backendDOMNodeId);
+            });
+        }
     };
 })();
 exports.CdpElementHandle = CdpElementHandle;
@@ -121780,6 +123059,12 @@ let EmulationManager = (() => {
             _private_setJavaScriptEnabled_decorators = [decorators_js_1.invokeAtMostOnceForArguments];
             __esDecorate(this, _private_applyViewport_descriptor = { value: __setFunctionName(async function (client, viewportState) {
                     if (!viewportState.viewport) {
+                        await Promise.all([
+                            client.send('Emulation.clearDeviceMetricsOverride'),
+                            client.send('Emulation.setTouchEmulationEnabled', {
+                                enabled: false,
+                            }),
+                        ]).catch(util_js_1.debugError);
                         return;
                     }
                     const { viewport } = viewportState;
@@ -121904,7 +123189,7 @@ let EmulationManager = (() => {
                 }, "#setJavaScriptEnabled") }, _private_setJavaScriptEnabled_decorators, { kind: "method", name: "#setJavaScriptEnabled", static: false, private: true, access: { has: obj => #setJavaScriptEnabled in obj, get: obj => obj.#setJavaScriptEnabled }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
-        #client = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #client = __runInitializers(this, _instanceExtraInitializers);
         #emulatingMobile = false;
         #hasTouch = false;
         #states = [];
@@ -121968,12 +123253,20 @@ let EmulationManager = (() => {
             return this.#javascriptEnabledState.state.javaScriptEnabled;
         }
         async emulateViewport(viewport) {
-            await this.#viewportState.setState({
-                viewport,
-                active: true,
-            });
-            const mobile = viewport.isMobile || false;
-            const hasTouch = viewport.hasTouch || false;
+            const currentState = this.#viewportState.state;
+            if (!viewport && !currentState.active) {
+                return false;
+            }
+            await this.#viewportState.setState(viewport
+                ? {
+                    viewport,
+                    active: true,
+                }
+                : {
+                    active: false,
+                });
+            const mobile = viewport?.isMobile || false;
+            const hasTouch = viewport?.hasTouch || false;
             const reloadNeeded = this.#emulatingMobile !== mobile || this.#hasTouch !== hasTouch;
             this.#emulatingMobile = mobile;
             this.#hasTouch = hasTouch;
@@ -122096,7 +123389,7 @@ exports.EmulationManager = EmulationManager;
 /***/ }),
 
 /***/ 26916:
-/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
@@ -122105,33 +123398,196 @@ exports.EmulationManager = EmulationManager;
  * Copyright 2017 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
+var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
+    if (value !== null && value !== void 0) {
+        if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
+        var dispose;
+        if (async) {
+            if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
+            dispose = value[Symbol.asyncDispose];
+        }
+        if (dispose === void 0) {
+            if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
+            dispose = value[Symbol.dispose];
+        }
+        if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
+        env.stack.push({ value: value, dispose: dispose, async: async });
+    }
+    else if (async) {
+        env.stack.push({ async: true });
+    }
+    return value;
+};
+var __disposeResources = (this && this.__disposeResources) || (function (SuppressedError) {
+    return function (env) {
+        function fail(e) {
+            env.error = env.hasError ? new SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
+            env.hasError = true;
+        }
+        function next() {
+            while (env.stack.length) {
+                var rec = env.stack.pop();
+                try {
+                    var result = rec.dispose && rec.dispose.call(rec.value);
+                    if (rec.async) return Promise.resolve(result).then(next, function(e) { fail(e); return next(); });
+                }
+                catch (e) {
+                    fail(e);
+                }
+            }
+            if (env.hasError) throw env.error;
+        }
+        return next();
+    };
+})(typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
+    var e = new Error(message);
+    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
+});
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.createCdpHandle = exports.ExecutionContext = void 0;
+exports.ExecutionContext = void 0;
+const CDPSession_js_1 = __nccwpck_require__(45639);
+const EventEmitter_js_1 = __nccwpck_require__(7692);
 const LazyArg_js_1 = __nccwpck_require__(64897);
 const ScriptInjector_js_1 = __nccwpck_require__(52379);
 const util_js_1 = __nccwpck_require__(78274);
 const AsyncIterableUtil_js_1 = __nccwpck_require__(96992);
+const disposable_js_1 = __nccwpck_require__(97805);
 const Function_js_1 = __nccwpck_require__(82329);
+const Mutex_js_1 = __nccwpck_require__(2828);
 const AriaQueryHandler_js_1 = __nccwpck_require__(81129);
 const Binding_js_1 = __nccwpck_require__(32567);
 const ElementHandle_js_1 = __nccwpck_require__(28099);
 const JSHandle_js_1 = __nccwpck_require__(85326);
 const utils_js_1 = __nccwpck_require__(34678);
+const ariaQuerySelectorBinding = new Binding_js_1.Binding('__ariaQuerySelector', AriaQueryHandler_js_1.ARIAQueryHandler.queryOne, '' // custom init
+);
+const ariaQuerySelectorAllBinding = new Binding_js_1.Binding('__ariaQuerySelectorAll', (async (element, selector) => {
+    const results = AriaQueryHandler_js_1.ARIAQueryHandler.queryAll(element, selector);
+    return await element.realm.evaluateHandle((...elements) => {
+        return elements;
+    }, ...(await AsyncIterableUtil_js_1.AsyncIterableUtil.collect(results)));
+}), '' // custom init
+);
 /**
  * @internal
  */
-class ExecutionContext {
-    _client;
-    _world;
-    _contextId;
-    _contextName;
+class ExecutionContext extends EventEmitter_js_1.EventEmitter {
+    #client;
+    #world;
+    #id;
+    #name;
+    #disposables = new disposable_js_1.DisposableStack();
     constructor(client, contextPayload, world) {
-        this._client = client;
-        this._world = world;
-        this._contextId = contextPayload.id;
+        super();
+        this.#client = client;
+        this.#world = world;
+        this.#id = contextPayload.id;
         if (contextPayload.name) {
-            this._contextName = contextPayload.name;
+            this.#name = contextPayload.name;
         }
+        const clientEmitter = this.#disposables.use(new EventEmitter_js_1.EventEmitter(this.#client));
+        clientEmitter.on('Runtime.bindingCalled', this.#onBindingCalled.bind(this));
+        clientEmitter.on('Runtime.executionContextDestroyed', async (event) => {
+            if (event.executionContextId === this.#id) {
+                this[disposable_js_1.disposeSymbol]();
+            }
+        });
+        clientEmitter.on('Runtime.executionContextsCleared', async () => {
+            this[disposable_js_1.disposeSymbol]();
+        });
+        clientEmitter.on('Runtime.consoleAPICalled', this.#onConsoleAPI.bind(this));
+        clientEmitter.on(CDPSession_js_1.CDPSessionEvent.Disconnected, () => {
+            this[disposable_js_1.disposeSymbol]();
+        });
+    }
+    // Contains mapping from functions that should be bound to Puppeteer functions.
+    #bindings = new Map();
+    // If multiple waitFor are set up asynchronously, we need to wait for the
+    // first one to set up the binding in the page before running the others.
+    #mutex = new Mutex_js_1.Mutex();
+    async #addBinding(binding) {
+        const env_1 = { stack: [], error: void 0, hasError: false };
+        try {
+            if (this.#bindings.has(binding.name)) {
+                return;
+            }
+            const _ = __addDisposableResource(env_1, await this.#mutex.acquire(), false);
+            try {
+                await this.#client.send('Runtime.addBinding', this.#name
+                    ? {
+                        name: utils_js_1.CDP_BINDING_PREFIX + binding.name,
+                        executionContextName: this.#name,
+                    }
+                    : {
+                        name: utils_js_1.CDP_BINDING_PREFIX + binding.name,
+                        executionContextId: this.#id,
+                    });
+                await this.evaluate(utils_js_1.addPageBinding, 'internal', binding.name, utils_js_1.CDP_BINDING_PREFIX);
+                this.#bindings.set(binding.name, binding);
+            }
+            catch (error) {
+                // We could have tried to evaluate in a context which was already
+                // destroyed. This happens, for example, if the page is navigated while
+                // we are trying to add the binding
+                if (error instanceof Error) {
+                    // Destroyed context.
+                    if (error.message.includes('Execution context was destroyed')) {
+                        return;
+                    }
+                    // Missing context.
+                    if (error.message.includes('Cannot find context with specified id')) {
+                        return;
+                    }
+                }
+                (0, util_js_1.debugError)(error);
+            }
+        }
+        catch (e_1) {
+            env_1.error = e_1;
+            env_1.hasError = true;
+        }
+        finally {
+            __disposeResources(env_1);
+        }
+    }
+    async #onBindingCalled(event) {
+        if (event.executionContextId !== this.#id) {
+            return;
+        }
+        let payload;
+        try {
+            payload = JSON.parse(event.payload);
+        }
+        catch {
+            // The binding was either called by something in the page or it was
+            // called before our wrapper was initialized.
+            return;
+        }
+        const { type, name, seq, args, isTrivial } = payload;
+        if (type !== 'internal') {
+            this.emit('bindingcalled', event);
+            return;
+        }
+        if (!this.#bindings.has(name)) {
+            this.emit('bindingcalled', event);
+            return;
+        }
+        try {
+            const binding = this.#bindings.get(name);
+            await binding?.run(this, seq, args, isTrivial);
+        }
+        catch (err) {
+            (0, util_js_1.debugError)(err);
+        }
+    }
+    get id() {
+        return this.#id;
+    }
+    #onConsoleAPI(event) {
+        if (event.executionContextId !== this.#id) {
+            return;
+        }
+        this.emit('consoleapicalled', event);
     }
     #bindingsInstalled = false;
     #puppeteerUtil;
@@ -122139,13 +123595,8 @@ class ExecutionContext {
         let promise = Promise.resolve();
         if (!this.#bindingsInstalled) {
             promise = Promise.all([
-                this.#installGlobalBinding(new Binding_js_1.Binding('__ariaQuerySelector', AriaQueryHandler_js_1.ARIAQueryHandler.queryOne)),
-                this.#installGlobalBinding(new Binding_js_1.Binding('__ariaQuerySelectorAll', (async (element, selector) => {
-                    const results = AriaQueryHandler_js_1.ARIAQueryHandler.queryAll(element, selector);
-                    return await element.realm.evaluateHandle((...elements) => {
-                        return elements;
-                    }, ...(await AsyncIterableUtil_js_1.AsyncIterableUtil.collect(results)));
-                }))),
+                this.#addBindingWithoutThrowing(ariaQuerySelectorBinding),
+                this.#addBindingWithoutThrowing(ariaQuerySelectorAllBinding),
             ]);
             this.#bindingsInstalled = true;
         }
@@ -122161,17 +123612,15 @@ class ExecutionContext {
         }, !this.#puppeteerUtil);
         return this.#puppeteerUtil;
     }
-    async #installGlobalBinding(binding) {
+    async #addBindingWithoutThrowing(binding) {
         try {
-            if (this._world) {
-                this._world._bindings.set(binding.name, binding);
-                await this._world._addBindingToContext(this, binding.name);
-            }
+            await this.#addBinding(binding);
         }
-        catch {
+        catch (err) {
             // If the binding cannot be added, then either the browser doesn't support
             // bindings (e.g. Firefox) or the context is broken. Either breakage is
             // okay, so we ignore the error.
+            (0, util_js_1.debugError)(err);
         }
     }
     /**
@@ -122273,12 +123722,12 @@ class ExecutionContext {
         const sourceUrlComment = (0, util_js_1.getSourceUrlComment)((0, util_js_1.getSourcePuppeteerURLIfAvailable)(pageFunction)?.toString() ??
             util_js_1.PuppeteerURL.INTERNAL_URL);
         if ((0, util_js_1.isString)(pageFunction)) {
-            const contextId = this._contextId;
+            const contextId = this.#id;
             const expression = pageFunction;
             const expressionWithSourceUrl = util_js_1.SOURCE_URL_REGEX.test(expression)
                 ? expression
                 : `${expression}\n${sourceUrlComment}\n`;
-            const { exceptionDetails, result: remoteObject } = await this._client
+            const { exceptionDetails, result: remoteObject } = await this.#client
                 .send('Runtime.evaluate', {
                 expression: expressionWithSourceUrl,
                 contextId,
@@ -122292,7 +123741,7 @@ class ExecutionContext {
             }
             return returnByValue
                 ? (0, utils_js_1.valueFromRemoteObject)(remoteObject)
-                : createCdpHandle(this._world, remoteObject);
+                : this.#world.createCdpHandle(remoteObject);
         }
         const functionDeclaration = (0, Function_js_1.stringifyFunction)(pageFunction);
         const functionDeclarationWithSourceUrl = util_js_1.SOURCE_URL_REGEX.test(functionDeclaration)
@@ -122300,12 +123749,20 @@ class ExecutionContext {
             : `${functionDeclaration}\n${sourceUrlComment}\n`;
         let callFunctionOnPromise;
         try {
-            callFunctionOnPromise = this._client.send('Runtime.callFunctionOn', {
+            callFunctionOnPromise = this.#client.send('Runtime.callFunctionOn', {
                 functionDeclaration: functionDeclarationWithSourceUrl,
-                executionContextId: this._contextId,
-                arguments: args.length
-                    ? await Promise.all(args.map(convertArgument.bind(this)))
-                    : [],
+                executionContextId: this.#id,
+                // LazyArgs are used only internally and should not affect the order
+                // evaluate calls for the public APIs.
+                arguments: args.some(arg => {
+                    return arg instanceof LazyArg_js_1.LazyArg;
+                })
+                    ? await Promise.all(args.map(arg => {
+                        return convertArgumentAsync(this, arg);
+                    }))
+                    : args.map(arg => {
+                        return convertArgument(this, arg);
+                    }),
                 returnByValue,
                 awaitPromise: true,
                 userGesture: true,
@@ -122324,11 +123781,14 @@ class ExecutionContext {
         }
         return returnByValue
             ? (0, utils_js_1.valueFromRemoteObject)(remoteObject)
-            : createCdpHandle(this._world, remoteObject);
-        async function convertArgument(arg) {
+            : this.#world.createCdpHandle(remoteObject);
+        async function convertArgumentAsync(context, arg) {
             if (arg instanceof LazyArg_js_1.LazyArg) {
-                arg = await arg.get(this);
+                arg = await arg.get(context);
             }
+            return convertArgument(context, arg);
+        }
+        function convertArgument(context, arg) {
             if (typeof arg === 'bigint') {
                 // eslint-disable-line valid-typeof
                 return { unserializableValue: `${arg.toString()}n` };
@@ -122349,7 +123809,7 @@ class ExecutionContext {
                 ? arg
                 : null;
             if (objectHandle) {
-                if (objectHandle.realm !== this._world) {
+                if (objectHandle.realm !== context.#world) {
                     throw new Error('JSHandles can be evaluated only in the context they were created!');
                 }
                 if (objectHandle.disposed) {
@@ -122368,6 +123828,10 @@ class ExecutionContext {
             return { value: arg };
         }
     }
+    [disposable_js_1.disposeSymbol]() {
+        this.#disposables.dispose();
+        this.emit('disposed', undefined);
+    }
 }
 exports.ExecutionContext = ExecutionContext;
 const rewriteError = (error) => {
@@ -122383,17 +123847,180 @@ const rewriteError = (error) => {
     }
     throw error;
 };
-/**
- * @internal
- */
-function createCdpHandle(realm, remoteObject) {
-    if (remoteObject.subtype === 'node') {
-        return new ElementHandle_js_1.CdpElementHandle(realm, remoteObject);
-    }
-    return new JSHandle_js_1.CdpJSHandle(realm, remoteObject);
-}
-exports.createCdpHandle = createCdpHandle;
 //# sourceMappingURL=ExecutionContext.js.map
+
+/***/ }),
+
+/***/ 16668:
+/***/ ((__unused_webpack_module, exports) => {
+
+"use strict";
+
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.ExtensionTransport = void 0;
+const tabTargetInfo = {
+    targetId: 'tabTargetId',
+    type: 'tab',
+    title: 'tab',
+    url: 'about:blank',
+    attached: false,
+    canAccessOpener: false,
+};
+const pageTargetInfo = {
+    targetId: 'pageTargetId',
+    type: 'page',
+    title: 'page',
+    url: 'about:blank',
+    attached: false,
+    canAccessOpener: false,
+};
+/**
+ * Experimental ExtensionTransport allows establishing a connection via
+ * chrome.debugger API if Puppeteer runs in an extension. Since Chrome
+ * DevTools Protocol is restricted for extensions, the transport
+ * implements missing commands and events.
+ *
+ * @experimental
+ * @public
+ */
+class ExtensionTransport {
+    static async connectTab(tabId) {
+        await chrome.debugger.attach({ tabId }, '1.3');
+        return new ExtensionTransport(tabId);
+    }
+    onmessage;
+    onclose;
+    #tabId;
+    /**
+     * @internal
+     */
+    constructor(tabId) {
+        this.#tabId = tabId;
+        chrome.debugger.onEvent.addListener(this.#debuggerEventHandler);
+    }
+    #debuggerEventHandler = (source, method, params) => {
+        if (source.tabId !== this.#tabId) {
+            return;
+        }
+        this.#dispatchResponse({
+            // @ts-expect-error sessionId is not in stable yet.
+            sessionId: source.sessionId ?? 'pageTargetSessionId',
+            method: method,
+            params: params,
+        });
+    };
+    #dispatchResponse(message) {
+        this.onmessage?.(JSON.stringify(message));
+    }
+    send(message) {
+        const parsed = JSON.parse(message);
+        switch (parsed.method) {
+            case 'Browser.getVersion': {
+                this.#dispatchResponse({
+                    id: parsed.id,
+                    sessionId: parsed.sessionId,
+                    method: parsed.method,
+                    result: {
+                        protocolVersion: '1.3',
+                        product: 'chrome',
+                        revision: 'unknown',
+                        userAgent: 'chrome',
+                        jsVersion: 'unknown',
+                    },
+                });
+                return;
+            }
+            case 'Target.getBrowserContexts': {
+                this.#dispatchResponse({
+                    id: parsed.id,
+                    sessionId: parsed.sessionId,
+                    method: parsed.method,
+                    result: {
+                        browserContextIds: [],
+                    },
+                });
+                return;
+            }
+            case 'Target.setDiscoverTargets': {
+                this.#dispatchResponse({
+                    method: 'Target.targetCreated',
+                    params: {
+                        targetInfo: tabTargetInfo,
+                    },
+                });
+                this.#dispatchResponse({
+                    method: 'Target.targetCreated',
+                    params: {
+                        targetInfo: pageTargetInfo,
+                    },
+                });
+                this.#dispatchResponse({
+                    id: parsed.id,
+                    sessionId: parsed.sessionId,
+                    method: parsed.method,
+                    result: {},
+                });
+                return;
+            }
+            case 'Target.setAutoAttach': {
+                if (parsed.sessionId === 'tabTargetSessionId') {
+                    this.#dispatchResponse({
+                        method: 'Target.attachedToTarget',
+                        params: {
+                            targetInfo: pageTargetInfo,
+                            sessionId: 'pageTargetSessionId',
+                        },
+                    });
+                }
+                else if (!parsed.sessionId) {
+                    this.#dispatchResponse({
+                        method: 'Target.attachedToTarget',
+                        params: {
+                            targetInfo: tabTargetInfo,
+                            sessionId: 'tabTargetSessionId',
+                        },
+                    });
+                }
+                this.#dispatchResponse({
+                    id: parsed.id,
+                    sessionId: parsed.sessionId,
+                    method: parsed.method,
+                    result: {},
+                });
+                return;
+            }
+        }
+        if (parsed.sessionId === 'pageTargetSessionId') {
+            delete parsed.sessionId;
+        }
+        chrome.debugger
+            .sendCommand(
+        // @ts-expect-error sessionId is not in stable yet.
+        { tabId: this.#tabId, sessionId: parsed.sessionId }, parsed.method, parsed.params)
+            .then(response => {
+            this.#dispatchResponse({
+                id: parsed.id,
+                sessionId: parsed.sessionId ?? 'pageTargetSessionId',
+                method: parsed.method,
+                result: response,
+            });
+        })
+            .catch(err => {
+            this.#dispatchResponse({
+                id: parsed.id,
+                sessionId: parsed.sessionId ?? 'pageTargetSessionId',
+                method: parsed.method,
+                error: err,
+            });
+        });
+    }
+    close() {
+        chrome.debugger.onEvent.removeListener(this.#debuggerEventHandler);
+        void chrome.debugger.detach({ tabId: this.#tabId });
+    }
+}
+exports.ExtensionTransport = ExtensionTransport;
+//# sourceMappingURL=ExtensionTransport.js.map
 
 /***/ }),
 
@@ -122486,6 +124113,9 @@ class FirefoxTargetManager extends EventEmitter_js_1.EventEmitter {
     }
     getAvailableTargets() {
         return this.#availableTargetsByTargetId;
+    }
+    getChildTargets(_target) {
+        return new Set();
     }
     dispose() {
         this.#connection.off('Target.targetCreated', this.#onTargetCreated);
@@ -122603,12 +124233,16 @@ Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CdpFrame = void 0;
 const Frame_js_1 = __nccwpck_require__(61797);
 const Errors_js_1 = __nccwpck_require__(36315);
+const util_js_1 = __nccwpck_require__(78274);
 const Deferred_js_1 = __nccwpck_require__(73791);
 const disposable_js_1 = __nccwpck_require__(97805);
 const ErrorLike_js_1 = __nccwpck_require__(32937);
+const Accessibility_js_1 = __nccwpck_require__(64721);
+const FrameManagerEvents_js_1 = __nccwpck_require__(47081);
 const IsolatedWorld_js_1 = __nccwpck_require__(47869);
 const IsolatedWorlds_js_1 = __nccwpck_require__(56261);
 const LifecycleWatcher_js_1 = __nccwpck_require__(28890);
+const utils_js_1 = __nccwpck_require__(34678);
 /**
  * @internal
  */
@@ -122618,6 +124252,9 @@ let CdpFrame = (() => {
     let _goto_decorators;
     let _waitForNavigation_decorators;
     let _setContent_decorators;
+    let _addPreloadScript_decorators;
+    let _addExposedFunctionBinding_decorators;
+    let _removeExposedFunctionBinding_decorators;
     let _waitForDevicePrompt_decorators;
     return class CdpFrame extends _classSuper {
         static {
@@ -122625,18 +124262,22 @@ let CdpFrame = (() => {
             __esDecorate(this, null, _goto_decorators, { kind: "method", name: "goto", static: false, private: false, access: { has: obj => "goto" in obj, get: obj => obj.goto }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _waitForNavigation_decorators, { kind: "method", name: "waitForNavigation", static: false, private: false, access: { has: obj => "waitForNavigation" in obj, get: obj => obj.waitForNavigation }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _setContent_decorators, { kind: "method", name: "setContent", static: false, private: false, access: { has: obj => "setContent" in obj, get: obj => obj.setContent }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _addPreloadScript_decorators, { kind: "method", name: "addPreloadScript", static: false, private: false, access: { has: obj => "addPreloadScript" in obj, get: obj => obj.addPreloadScript }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _addExposedFunctionBinding_decorators, { kind: "method", name: "addExposedFunctionBinding", static: false, private: false, access: { has: obj => "addExposedFunctionBinding" in obj, get: obj => obj.addExposedFunctionBinding }, metadata: _metadata }, null, _instanceExtraInitializers);
+            __esDecorate(this, null, _removeExposedFunctionBinding_decorators, { kind: "method", name: "removeExposedFunctionBinding", static: false, private: false, access: { has: obj => "removeExposedFunctionBinding" in obj, get: obj => obj.removeExposedFunctionBinding }, metadata: _metadata }, null, _instanceExtraInitializers);
             __esDecorate(this, null, _waitForDevicePrompt_decorators, { kind: "method", name: "waitForDevicePrompt", static: false, private: false, access: { has: obj => "waitForDevicePrompt" in obj, get: obj => obj.waitForDevicePrompt }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
         #url = (__runInitializers(this, _instanceExtraInitializers), '');
         #detached = false;
         #client;
-        worlds;
         _frameManager;
-        _id;
         _loaderId = '';
         _lifecycleEvents = new Set();
+        _id;
         _parentId;
+        accessibility;
+        worlds;
         constructor(frameManager, frameId, parentFrameId, client) {
             super();
             this._frameManager = frameManager;
@@ -122644,13 +124285,32 @@ let CdpFrame = (() => {
             this._id = frameId;
             this._parentId = parentFrameId;
             this.#detached = false;
+            this.#client = client;
             this._loaderId = '';
-            this.updateClient(client);
+            this.worlds = {
+                [IsolatedWorlds_js_1.MAIN_WORLD]: new IsolatedWorld_js_1.IsolatedWorld(this, this._frameManager.timeoutSettings),
+                [IsolatedWorlds_js_1.PUPPETEER_WORLD]: new IsolatedWorld_js_1.IsolatedWorld(this, this._frameManager.timeoutSettings),
+            };
+            this.accessibility = new Accessibility_js_1.Accessibility(this.worlds[IsolatedWorlds_js_1.MAIN_WORLD]);
             this.on(Frame_js_1.FrameEvent.FrameSwappedByActivation, () => {
                 // Emulate loading process for swapped frames.
                 this._onLoadingStarted();
                 this._onLoadingStopped();
             });
+            this.worlds[IsolatedWorlds_js_1.MAIN_WORLD].emitter.on('consoleapicalled', this.#onMainWorldConsoleApiCalled.bind(this));
+            this.worlds[IsolatedWorlds_js_1.MAIN_WORLD].emitter.on('bindingcalled', this.#onMainWorldBindingCalled.bind(this));
+        }
+        #onMainWorldConsoleApiCalled(event) {
+            this._frameManager.emit(FrameManagerEvents_js_1.FrameManagerEvent.ConsoleApiCalled, [
+                this.worlds[IsolatedWorlds_js_1.MAIN_WORLD],
+                event,
+            ]);
+        }
+        #onMainWorldBindingCalled(event) {
+            this._frameManager.emit(FrameManagerEvents_js_1.FrameManagerEvent.BindingCalled, [
+                this.worlds[IsolatedWorlds_js_1.MAIN_WORLD],
+                event,
+            ]);
         }
         /**
          * This is used internally in DevTools.
@@ -122667,23 +124327,8 @@ let CdpFrame = (() => {
         updateId(id) {
             this._id = id;
         }
-        updateClient(client, keepWorlds = false) {
+        updateClient(client) {
             this.#client = client;
-            if (!keepWorlds) {
-                // Clear the current contexts on previous world instances.
-                if (this.worlds) {
-                    this.worlds[IsolatedWorlds_js_1.MAIN_WORLD].clearContext();
-                    this.worlds[IsolatedWorlds_js_1.PUPPETEER_WORLD].clearContext();
-                }
-                this.worlds = {
-                    [IsolatedWorlds_js_1.MAIN_WORLD]: new IsolatedWorld_js_1.IsolatedWorld(this, this._frameManager.timeoutSettings),
-                    [IsolatedWorlds_js_1.PUPPETEER_WORLD]: new IsolatedWorld_js_1.IsolatedWorld(this, this._frameManager.timeoutSettings),
-                };
-            }
-            else {
-                this.worlds[IsolatedWorlds_js_1.MAIN_WORLD].frameUpdated();
-                this.worlds[IsolatedWorlds_js_1.PUPPETEER_WORLD].frameUpdated();
-            }
         }
         page() {
             return this._frameManager.page();
@@ -122741,8 +124386,8 @@ let CdpFrame = (() => {
             }
         }
         async waitForNavigation(options = {}) {
-            const { waitUntil = ['load'], timeout = this._frameManager.timeoutSettings.navigationTimeout(), } = options;
-            const watcher = new LifecycleWatcher_js_1.LifecycleWatcher(this._frameManager.networkManager, this, waitUntil, timeout);
+            const { waitUntil = ['load'], timeout = this._frameManager.timeoutSettings.navigationTimeout(), signal, } = options;
+            const watcher = new LifecycleWatcher_js_1.LifecycleWatcher(this._frameManager.networkManager, this, waitUntil, timeout, signal);
             const error = await Deferred_js_1.Deferred.race([
                 watcher.terminationPromise(),
                 ...(options.ignoreSameDocumentNavigation
@@ -122806,6 +124451,48 @@ let CdpFrame = (() => {
                 return rootFrame._frameManager._deviceRequestPromptManager(this.#client);
             }
         }
+        async addPreloadScript(preloadScript) {
+            if (!this.isOOPFrame() && this !== this._frameManager.mainFrame()) {
+                return;
+            }
+            if (preloadScript.getIdForFrame(this)) {
+                return;
+            }
+            const { identifier } = await this.#client.send('Page.addScriptToEvaluateOnNewDocument', {
+                source: preloadScript.source,
+            });
+            preloadScript.setIdForFrame(this, identifier);
+        }
+        async addExposedFunctionBinding(binding) {
+            // If a frame has not started loading, it might never start. Rely on
+            // addScriptToEvaluateOnNewDocument in that case.
+            if (this !== this._frameManager.mainFrame() && !this._hasStartedLoading) {
+                return;
+            }
+            await Promise.all([
+                this.#client.send('Runtime.addBinding', {
+                    name: utils_js_1.CDP_BINDING_PREFIX + binding.name,
+                }),
+                this.evaluate(binding.initSource).catch(util_js_1.debugError),
+            ]);
+        }
+        async removeExposedFunctionBinding(binding) {
+            // If a frame has not started loading, it might never start. Rely on
+            // addScriptToEvaluateOnNewDocument in that case.
+            if (this !== this._frameManager.mainFrame() && !this._hasStartedLoading) {
+                return;
+            }
+            await Promise.all([
+                this.#client.send('Runtime.removeBinding', {
+                    name: utils_js_1.CDP_BINDING_PREFIX + binding.name,
+                }),
+                this.evaluate(name => {
+                    // Removes the dangling Puppeteer binding wrapper.
+                    // @ts-expect-error: In a different context.
+                    globalThis[name] = undefined;
+                }, binding.name).catch(util_js_1.debugError),
+            ]);
+        }
         async waitForDevicePrompt(options = {}) {
             return await this.#deviceRequestPromptManager().waitForDevicePrompt(options);
         }
@@ -122833,7 +124520,7 @@ let CdpFrame = (() => {
         get detached() {
             return this.#detached;
         }
-        [(_goto_decorators = [Frame_js_1.throwIfDetached], _waitForNavigation_decorators = [Frame_js_1.throwIfDetached], _setContent_decorators = [Frame_js_1.throwIfDetached], _waitForDevicePrompt_decorators = [Frame_js_1.throwIfDetached], disposable_js_1.disposeSymbol)]() {
+        [(_goto_decorators = [Frame_js_1.throwIfDetached], _waitForNavigation_decorators = [Frame_js_1.throwIfDetached], _setContent_decorators = [Frame_js_1.throwIfDetached], _addPreloadScript_decorators = [Frame_js_1.throwIfDetached], _addExposedFunctionBinding_decorators = [Frame_js_1.throwIfDetached], _removeExposedFunctionBinding_decorators = [Frame_js_1.throwIfDetached], _waitForDevicePrompt_decorators = [Frame_js_1.throwIfDetached], disposable_js_1.disposeSymbol)]() {
             if (this.#detached) {
                 return;
             }
@@ -122871,6 +124558,7 @@ const assert_js_1 = __nccwpck_require__(97729);
 const Deferred_js_1 = __nccwpck_require__(73791);
 const disposable_js_1 = __nccwpck_require__(97805);
 const ErrorLike_js_1 = __nccwpck_require__(32937);
+const CdpPreloadScript_js_1 = __nccwpck_require__(61644);
 const CDPSession_js_2 = __nccwpck_require__(32711);
 const Connection_js_1 = __nccwpck_require__(94009);
 const DeviceRequestPrompt_js_1 = __nccwpck_require__(19758);
@@ -122890,9 +124578,10 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
     #page;
     #networkManager;
     #timeoutSettings;
-    #contextIdToContext = new Map();
     #isolatedWorlds = new Set();
     #client;
+    #scriptsToEvaluateOnNewDocument = new Map();
+    #bindings = new Set();
     _frameTree = new FrameTree_js_1.FrameTree();
     /**
      * Set of frame IDs stored to indicate if a frame has received a
@@ -122911,11 +124600,11 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
     get client() {
         return this.#client;
     }
-    constructor(client, page, ignoreHTTPSErrors, timeoutSettings) {
+    constructor(client, page, timeoutSettings) {
         super();
         this.#client = client;
         this.#page = page;
-        this.#networkManager = new NetworkManager_js_1.NetworkManager(ignoreHTTPSErrors, this);
+        this.#networkManager = new NetworkManager_js_1.NetworkManager(this);
         this.#timeoutSettings = timeoutSettings;
         this.setupEventListeners(this.#client);
         client.once(CDPSession_js_1.CDPSessionEvent.Disconnected, () => {
@@ -122955,7 +124644,6 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
      * its frame tree and ID.
      */
     async swapFrameTree(client) {
-        this.#onExecutionContextsCleared(this.#client);
         this.#client = client;
         (0, assert_js_1.assert)(this.#client instanceof CDPSession_js_2.CdpCDPSession, 'CDPSession is not an instance of CDPSessionImpl.');
         const frame = this._frameTree.getMainFrame();
@@ -122963,16 +124651,14 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
             this.#frameNavigatedReceived.add(this.#client._target()._targetId);
             this._frameTree.removeFrame(frame);
             frame.updateId(this.#client._target()._targetId);
-            frame.mainRealm().clearContext();
-            frame.isolatedRealm().clearContext();
             this._frameTree.addFrame(frame);
-            frame.updateClient(client, true);
+            frame.updateClient(client);
         }
         this.setupEventListeners(client);
         client.once(CDPSession_js_1.CDPSessionEvent.Disconnected, () => {
             this.#onClientDisconnect().catch(util_js_1.debugError);
         });
-        await this.initialize(client);
+        await this.initialize(client, frame);
         await this.#networkManager.addClient(client);
         if (frame) {
             frame.emit(Frame_js_1.FrameEvent.FrameSwappedByActivation, undefined);
@@ -123011,20 +124697,12 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
             await this.#frameTreeHandled?.valueOrThrow();
             this.#onExecutionContextCreated(event.context, session);
         });
-        session.on('Runtime.executionContextDestroyed', async (event) => {
-            await this.#frameTreeHandled?.valueOrThrow();
-            this.#onExecutionContextDestroyed(event.executionContextId, session);
-        });
-        session.on('Runtime.executionContextsCleared', async () => {
-            await this.#frameTreeHandled?.valueOrThrow();
-            this.#onExecutionContextsCleared(session);
-        });
         session.on('Page.lifecycleEvent', async (event) => {
             await this.#frameTreeHandled?.valueOrThrow();
             this.#onLifecycleEvent(event);
         });
     }
-    async initialize(client) {
+    async initialize(client, frame) {
         try {
             this.#frameTreeHandled?.resolve();
             this.#frameTreeHandled = Deferred_js_1.Deferred.create();
@@ -123043,6 +124721,14 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
                 client.send('Runtime.enable').then(() => {
                     return this.#createIsolatedWorld(client, util_js_1.UTILITY_WORLD_NAME);
                 }),
+                ...(frame
+                    ? Array.from(this.#scriptsToEvaluateOnNewDocument.values())
+                    : []).map(script => {
+                    return frame?.addPreloadScript(script);
+                }),
+                ...(frame ? Array.from(this.#bindings.values()) : []).map(binding => {
+                    return frame?.addExposedFunctionBinding(binding);
+                }),
             ]);
         }
         catch (error) {
@@ -123053,14 +124739,6 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
             }
             throw error;
         }
-    }
-    executionContextById(contextId, session = this.#client) {
-        const context = this.getExecutionContextById(contextId, session);
-        (0, assert_js_1.assert)(context, 'INTERNAL ERROR: missing context with id = ' + contextId);
-        return context;
-    }
-    getExecutionContextById(contextId, session = this.#client) {
-        return this.#contextIdToContext.get(`${session.id()}:${contextId}`);
     }
     page() {
         return this.#page;
@@ -123076,6 +124754,50 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
     frame(frameId) {
         return this._frameTree.getById(frameId) || null;
     }
+    async addExposedFunctionBinding(binding) {
+        this.#bindings.add(binding);
+        await Promise.all(this.frames().map(async (frame) => {
+            return await frame.addExposedFunctionBinding(binding);
+        }));
+    }
+    async removeExposedFunctionBinding(binding) {
+        this.#bindings.delete(binding);
+        await Promise.all(this.frames().map(async (frame) => {
+            return await frame.removeExposedFunctionBinding(binding);
+        }));
+    }
+    async evaluateOnNewDocument(source) {
+        const { identifier } = await this.mainFrame()
+            ._client()
+            .send('Page.addScriptToEvaluateOnNewDocument', {
+            source,
+        });
+        const preloadScript = new CdpPreloadScript_js_1.CdpPreloadScript(this.mainFrame(), identifier, source);
+        this.#scriptsToEvaluateOnNewDocument.set(identifier, preloadScript);
+        await Promise.all(this.frames().map(async (frame) => {
+            return await frame.addPreloadScript(preloadScript);
+        }));
+        return { identifier };
+    }
+    async removeScriptToEvaluateOnNewDocument(identifier) {
+        const preloadScript = this.#scriptsToEvaluateOnNewDocument.get(identifier);
+        if (!preloadScript) {
+            throw new Error(`Script to evaluate on new document with id ${identifier} not found`);
+        }
+        this.#scriptsToEvaluateOnNewDocument.delete(identifier);
+        await Promise.all(this.frames().map(frame => {
+            const identifier = preloadScript.getIdForFrame(frame);
+            if (!identifier) {
+                return;
+            }
+            return frame
+                ._client()
+                .send('Page.removeScriptToEvaluateOnNewDocument', {
+                identifier,
+            })
+                .catch(util_js_1.debugError);
+        }));
+    }
     onAttachedToTarget(target) {
         if (target._getTargetInfo().type !== 'iframe') {
             return;
@@ -123085,7 +124807,7 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
             frame.updateClient(target._session());
         }
         this.setupEventListeners(target._session());
-        void this.initialize(target._session());
+        void this.initialize(target._session(), frame);
     }
     _deviceRequestPromptManager(client) {
         let manager = this.#deviceRequestPromptManagerMap.get(client);
@@ -123248,8 +124970,7 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
             if (contextPayload.auxData && contextPayload.auxData['isDefault']) {
                 world = frame.worlds[IsolatedWorlds_js_1.MAIN_WORLD];
             }
-            else if (contextPayload.name === util_js_1.UTILITY_WORLD_NAME &&
-                !frame.worlds[IsolatedWorlds_js_1.PUPPETEER_WORLD].hasContext()) {
+            else if (contextPayload.name === util_js_1.UTILITY_WORLD_NAME) {
                 // In case of multiple sessions to the same target, there's a race between
                 // connections so we might end up creating multiple isolated worlds.
                 // We can use either.
@@ -123261,35 +124982,7 @@ class FrameManager extends EventEmitter_js_1.EventEmitter {
             return;
         }
         const context = new ExecutionContext_js_1.ExecutionContext(frame?.client || this.#client, contextPayload, world);
-        if (world) {
-            world.setContext(context);
-        }
-        const key = `${session.id()}:${contextPayload.id}`;
-        this.#contextIdToContext.set(key, context);
-    }
-    #onExecutionContextDestroyed(executionContextId, session) {
-        const key = `${session.id()}:${executionContextId}`;
-        const context = this.#contextIdToContext.get(key);
-        if (!context) {
-            return;
-        }
-        this.#contextIdToContext.delete(key);
-        if (context._world) {
-            context._world.clearContext();
-        }
-    }
-    #onExecutionContextsCleared(session) {
-        for (const [key, context] of this.#contextIdToContext.entries()) {
-            // Make sure to only clear execution contexts that belong
-            // to the current session.
-            if (context._client !== session) {
-                continue;
-            }
-            if (context._world) {
-                context._world.clearContext();
-            }
-            this.#contextIdToContext.delete(key);
-        }
+        world.setContext(context);
     }
     #removeFramesRecursively(frame) {
         for (const child of frame.childFrames()) {
@@ -123333,6 +125026,8 @@ var FrameManagerEvent;
     FrameManagerEvent.FrameSwapped = Symbol('FrameManager.FrameSwapped');
     FrameManagerEvent.LifecycleEvent = Symbol('FrameManager.LifecycleEvent');
     FrameManagerEvent.FrameNavigatedWithinDocument = Symbol('FrameManager.FrameNavigatedWithinDocument');
+    FrameManagerEvent.ConsoleApiCalled = Symbol('FrameManager.ConsoleApiCalled');
+    FrameManagerEvent.BindingCalled = Symbol('FrameManager.BindingCalled');
 })(FrameManagerEvent || (exports.FrameManagerEvent = FrameManagerEvent = {}));
 //# sourceMappingURL=FrameManagerEvents.js.map
 
@@ -123546,9 +125241,7 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     async _continue(overrides = {}) {
         const { url, method, postData, headers } = overrides;
         this.interception.handled = true;
-        const postDataBinaryBase64 = postData
-            ? Buffer.from(postData).toString('base64')
-            : undefined;
+        const postDataBinaryBase64 = postData ? btoa(postData) : undefined;
         if (this._interceptionId === undefined) {
             throw new Error('HTTPRequest is missing _interceptionId needed for Fetch.continueRequest');
         }
@@ -123567,9 +125260,10 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
     }
     async _respond(response) {
         this.interception.handled = true;
-        const responseBody = response.body && (0, util_js_1.isString)(response.body)
-            ? Buffer.from(response.body)
-            : response.body || null;
+        let parsedBody;
+        if (response.body) {
+            parsedBody = HTTPRequest_js_1.HTTPRequest.getResponse(response.body);
+        }
         const responseHeaders = {};
         if (response.headers) {
             for (const header of Object.keys(response.headers)) {
@@ -123584,8 +125278,8 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
         if (response.contentType) {
             responseHeaders['content-type'] = response.contentType;
         }
-        if (responseBody && !('content-length' in responseHeaders)) {
-            responseHeaders['content-length'] = String(Buffer.byteLength(responseBody));
+        if (parsedBody?.contentLength && !('content-length' in responseHeaders)) {
+            responseHeaders['content-length'] = String(parsedBody.contentLength);
         }
         const status = response.status || 200;
         if (this._interceptionId === undefined) {
@@ -123597,7 +125291,7 @@ class CdpHTTPRequest extends HTTPRequest_js_1.HTTPRequest {
             responseCode: status,
             responsePhrase: HTTPRequest_js_1.STATUS_TEXTS[status],
             responseHeaders: (0, HTTPRequest_js_1.headersArray)(responseHeaders),
-            body: responseBody ? responseBody.toString('base64') : undefined,
+            body: parsedBody?.base64,
         })
             .catch(error => {
             this.interception.handled = false;
@@ -124244,7 +125938,7 @@ exports.CdpTouchscreen = CdpTouchscreen;
 /***/ }),
 
 /***/ 47869:
-/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
 
 "use strict";
 
@@ -124253,209 +125947,113 @@ exports.CdpTouchscreen = CdpTouchscreen;
  * Copyright 2019 Google Inc.
  * SPDX-License-Identifier: Apache-2.0
  */
-var __addDisposableResource = (this && this.__addDisposableResource) || function (env, value, async) {
-    if (value !== null && value !== void 0) {
-        if (typeof value !== "object" && typeof value !== "function") throw new TypeError("Object expected.");
-        var dispose;
-        if (async) {
-            if (!Symbol.asyncDispose) throw new TypeError("Symbol.asyncDispose is not defined.");
-            dispose = value[Symbol.asyncDispose];
-        }
-        if (dispose === void 0) {
-            if (!Symbol.dispose) throw new TypeError("Symbol.dispose is not defined.");
-            dispose = value[Symbol.dispose];
-        }
-        if (typeof dispose !== "function") throw new TypeError("Object not disposable.");
-        env.stack.push({ value: value, dispose: dispose, async: async });
-    }
-    else if (async) {
-        env.stack.push({ async: true });
-    }
-    return value;
-};
-var __disposeResources = (this && this.__disposeResources) || (function (SuppressedError) {
-    return function (env) {
-        function fail(e) {
-            env.error = env.hasError ? new SuppressedError(e, env.error, "An error was suppressed during disposal.") : e;
-            env.hasError = true;
-        }
-        function next() {
-            while (env.stack.length) {
-                var rec = env.stack.pop();
-                try {
-                    var result = rec.dispose && rec.dispose.call(rec.value);
-                    if (rec.async) return Promise.resolve(result).then(next, function(e) { fail(e); return next(); });
-                }
-                catch (e) {
-                    fail(e);
-                }
-            }
-            if (env.hasError) throw env.error;
-        }
-        return next();
-    };
-})(typeof SuppressedError === "function" ? SuppressedError : function (error, suppressed, message) {
-    var e = new Error(message);
-    return e.name = "SuppressedError", e.error = error, e.suppressed = suppressed, e;
-});
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.IsolatedWorld = void 0;
+const rxjs_js_1 = __nccwpck_require__(35006);
 const Realm_js_1 = __nccwpck_require__(52224);
+const EventEmitter_js_1 = __nccwpck_require__(7692);
 const util_js_1 = __nccwpck_require__(78274);
-const Deferred_js_1 = __nccwpck_require__(73791);
 const disposable_js_1 = __nccwpck_require__(97805);
-const Mutex_js_1 = __nccwpck_require__(2828);
-const ExecutionContext_js_1 = __nccwpck_require__(26916);
-const utils_js_1 = __nccwpck_require__(34678);
+const ElementHandle_js_1 = __nccwpck_require__(28099);
+const JSHandle_js_1 = __nccwpck_require__(85326);
 /**
  * @internal
  */
 class IsolatedWorld extends Realm_js_1.Realm {
-    #context = Deferred_js_1.Deferred.create();
-    // Set of bindings that have been registered in the current context.
-    #contextBindings = new Set();
-    // Contains mapping from functions that should be bound to Puppeteer functions.
-    #bindings = new Map();
-    get _bindings() {
-        return this.#bindings;
-    }
+    #context;
+    #emitter = new EventEmitter_js_1.EventEmitter();
     #frameOrWorker;
     constructor(frameOrWorker, timeoutSettings) {
         super(timeoutSettings);
         this.#frameOrWorker = frameOrWorker;
-        this.frameUpdated();
     }
     get environment() {
         return this.#frameOrWorker;
     }
-    frameUpdated() {
-        this.client.on('Runtime.bindingCalled', this.#onBindingCalled);
-    }
     get client() {
         return this.#frameOrWorker.client;
     }
-    clearContext() {
-        // The message has to match the CDP message expected by the WaitTask class.
-        this.#context?.reject(new Error('Execution context was destroyed'));
-        this.#context = Deferred_js_1.Deferred.create();
+    get emitter() {
+        return this.#emitter;
+    }
+    setContext(context) {
+        this.#context?.[disposable_js_1.disposeSymbol]();
+        context.once('disposed', this.#onContextDisposed.bind(this));
+        context.on('consoleapicalled', this.#onContextConsoleApiCalled.bind(this));
+        context.on('bindingcalled', this.#onContextBindingCalled.bind(this));
+        this.#context = context;
+        this.#emitter.emit('context', context);
+        void this.taskManager.rerunAll();
+    }
+    #onContextDisposed() {
+        this.#context = undefined;
         if ('clearDocumentHandle' in this.#frameOrWorker) {
             this.#frameOrWorker.clearDocumentHandle();
         }
     }
-    setContext(context) {
-        this.#contextBindings.clear();
-        this.#context.resolve(context);
-        void this.taskManager.rerunAll();
+    #onContextConsoleApiCalled(event) {
+        this.#emitter.emit('consoleapicalled', event);
+    }
+    #onContextBindingCalled(event) {
+        this.#emitter.emit('bindingcalled', event);
     }
     hasContext() {
-        return this.#context.resolved();
+        return !!this.#context;
+    }
+    get context() {
+        return this.#context;
     }
     #executionContext() {
         if (this.disposed) {
-            throw new Error(`Execution context is not available in detached frame "${this.environment.url()}" (are you trying to evaluate?)`);
+            throw new Error(`Execution context is not available in detached frame or worker "${this.environment.url()}" (are you trying to evaluate?)`);
         }
-        if (this.#context === null) {
-            throw new Error(`Execution content promise is missing`);
-        }
-        return this.#context.valueOrThrow();
+        return this.#context;
+    }
+    /**
+     * Waits for the next context to be set on the isolated world.
+     */
+    async #waitForExecutionContext() {
+        const result = await (0, rxjs_js_1.firstValueFrom)((0, util_js_1.fromEmitterEvent)(this.#emitter, 'context').pipe((0, rxjs_js_1.raceWith)((0, util_js_1.fromEmitterEvent)(this.#emitter, 'disposed').pipe((0, rxjs_js_1.map)(() => {
+            // The message has to match the CDP message expected by the WaitTask class.
+            throw new Error('Execution context was destroyed');
+        })), (0, util_js_1.timeout)(this.timeoutSettings.timeout()))));
+        return result;
     }
     async evaluateHandle(pageFunction, ...args) {
         pageFunction = (0, util_js_1.withSourcePuppeteerURLIfNone)(this.evaluateHandle.name, pageFunction);
-        const context = await this.#executionContext();
+        // This code needs to schedule evaluateHandle call synchroniously (at
+        // least when the context is there) so we cannot unconditionally
+        // await.
+        let context = this.#executionContext();
+        if (!context) {
+            context = await this.#waitForExecutionContext();
+        }
         return await context.evaluateHandle(pageFunction, ...args);
     }
     async evaluate(pageFunction, ...args) {
         pageFunction = (0, util_js_1.withSourcePuppeteerURLIfNone)(this.evaluate.name, pageFunction);
-        let context = this.#context.value();
-        if (!context || !(context instanceof ExecutionContext_js_1.ExecutionContext)) {
-            context = await this.#executionContext();
+        // This code needs to schedule evaluate call synchroniously (at
+        // least when the context is there) so we cannot unconditionally
+        // await.
+        let context = this.#executionContext();
+        if (!context) {
+            context = await this.#waitForExecutionContext();
         }
         return await context.evaluate(pageFunction, ...args);
     }
-    // If multiple waitFor are set up asynchronously, we need to wait for the
-    // first one to set up the binding in the page before running the others.
-    #mutex = new Mutex_js_1.Mutex();
-    async _addBindingToContext(context, name) {
-        const env_1 = { stack: [], error: void 0, hasError: false };
-        try {
-            if (this.#contextBindings.has(name)) {
-                return;
-            }
-            const _ = __addDisposableResource(env_1, await this.#mutex.acquire(), false);
-            try {
-                await context._client.send('Runtime.addBinding', context._contextName
-                    ? {
-                        name,
-                        executionContextName: context._contextName,
-                    }
-                    : {
-                        name,
-                        executionContextId: context._contextId,
-                    });
-                await context.evaluate(utils_js_1.addPageBinding, 'internal', name);
-                this.#contextBindings.add(name);
-            }
-            catch (error) {
-                // We could have tried to evaluate in a context which was already
-                // destroyed. This happens, for example, if the page is navigated while
-                // we are trying to add the binding
-                if (error instanceof Error) {
-                    // Destroyed context.
-                    if (error.message.includes('Execution context was destroyed')) {
-                        return;
-                    }
-                    // Missing context.
-                    if (error.message.includes('Cannot find context with specified id')) {
-                        return;
-                    }
-                }
-                (0, util_js_1.debugError)(error);
-            }
-        }
-        catch (e_1) {
-            env_1.error = e_1;
-            env_1.hasError = true;
-        }
-        finally {
-            __disposeResources(env_1);
-        }
-    }
-    #onBindingCalled = async (event) => {
-        let payload;
-        try {
-            payload = JSON.parse(event.payload);
-        }
-        catch {
-            // The binding was either called by something in the page or it was
-            // called before our wrapper was initialized.
-            return;
-        }
-        const { type, name, seq, args, isTrivial } = payload;
-        if (type !== 'internal') {
-            return;
-        }
-        if (!this.#contextBindings.has(name)) {
-            return;
-        }
-        try {
-            const context = await this.#context.valueOrThrow();
-            if (event.executionContextId !== context._contextId) {
-                return;
-            }
-            const binding = this._bindings.get(name);
-            await binding?.run(context, seq, args, isTrivial);
-        }
-        catch (err) {
-            (0, util_js_1.debugError)(err);
-        }
-    };
     async adoptBackendNode(backendNodeId) {
-        const executionContext = await this.#executionContext();
+        // This code needs to schedule resolveNode call synchroniously (at
+        // least when the context is there) so we cannot unconditionally
+        // await.
+        let context = this.#executionContext();
+        if (!context) {
+            context = await this.#waitForExecutionContext();
+        }
         const { object } = await this.client.send('DOM.resolveNode', {
             backendNodeId: backendNodeId,
-            executionContextId: executionContext._contextId,
+            executionContextId: context.id,
         });
-        return (0, ExecutionContext_js_1.createCdpHandle)(this, object);
+        return this.createCdpHandle(object);
     }
     async adoptHandle(handle) {
         if (handle.realm === this) {
@@ -124485,9 +126083,20 @@ class IsolatedWorld extends Realm_js_1.Realm {
         await handle.dispose();
         return newHandle;
     }
+    /**
+     * @internal
+     */
+    createCdpHandle(remoteObject) {
+        if (remoteObject.subtype === 'node') {
+            return new ElementHandle_js_1.CdpElementHandle(this, remoteObject);
+        }
+        return new JSHandle_js_1.CdpJSHandle(this, remoteObject);
+    }
     [disposable_js_1.disposeSymbol]() {
+        this.#context?.[disposable_js_1.disposeSymbol]();
+        this.#emitter.emit('disposed', undefined);
         super[disposable_js_1.disposeSymbol]();
-        this.client.off('Runtime.bindingCalled', this.#onBindingCalled);
+        this.#emitter.removeAllListeners();
     }
 }
 exports.IsolatedWorld = IsolatedWorld;
@@ -124600,6 +126209,22 @@ class CdpJSHandle extends JSHandle_js_1.JSHandle {
     remoteObject() {
         return this.#remoteObject;
     }
+    async getProperties() {
+        // We use Runtime.getProperties rather than iterative version for
+        // improved performance as it allows getting everything at once.
+        const response = await this.client.send('Runtime.getProperties', {
+            objectId: this.#remoteObject.objectId,
+            ownProperties: true,
+        });
+        const result = new Map();
+        for (const property of response.result) {
+            if (!property.enumerable || !property.value) {
+                continue;
+            }
+            result.set(property.name, this.#world.createCdpHandle(property.value));
+        }
+        return result;
+    }
 }
 exports.CdpJSHandle = CdpJSHandle;
 /**
@@ -124664,7 +126289,7 @@ class LifecycleWatcher {
     #hasSameDocumentNavigation;
     #swapped;
     #navigationResponseReceived;
-    constructor(networkManager, frame, waitUntil, timeout) {
+    constructor(networkManager, frame, waitUntil, timeout, signal) {
         if (Array.isArray(waitUntil)) {
             waitUntil = waitUntil.slice();
         }
@@ -124676,6 +126301,9 @@ class LifecycleWatcher {
             const protocolEvent = puppeteerToProtocolLifecycle.get(value);
             (0, assert_js_1.assert)(protocolEvent, 'Unknown value for options.waitUntil: ' + value);
             return protocolEvent;
+        });
+        signal?.addEventListener('abort', () => {
+            this.#terminationDeferred.reject(signal.reason);
         });
         this.#frame = frame;
         this.#timeout = timeout;
@@ -124779,10 +126407,6 @@ class LifecycleWatcher {
                     return false;
                 }
             }
-            // TODO(#1): Its possible we don't need this check
-            // CDP provided the correct order for Loading Events
-            // And NetworkIdle is a global state
-            // Consider removing
             for (const child of frame.childFrames()) {
                 if (child._hasStartedLoading &&
                     !checkLifecycle(child, expectedLifecycle)) {
@@ -124968,11 +126592,10 @@ const NetworkEventManager_js_1 = __nccwpck_require__(10018);
  * @internal
  */
 class NetworkManager extends EventEmitter_js_1.EventEmitter {
-    #ignoreHTTPSErrors;
     #frameManager;
     #networkEventManager = new NetworkEventManager_js_1.NetworkEventManager();
     #extraHTTPHeaders;
-    #credentials;
+    #credentials = null;
     #attemptedAuthentications = new Set();
     #userRequestInterceptionEnabled = false;
     #protocolRequestInterceptionEnabled = false;
@@ -124992,9 +126615,8 @@ class NetworkManager extends EventEmitter_js_1.EventEmitter {
         [CDPSession_js_1.CDPSessionEvent.Disconnected, this.#removeClient],
     ];
     #clients = new Map();
-    constructor(ignoreHTTPSErrors, frameManager) {
+    constructor(frameManager) {
         super();
-        this.#ignoreHTTPSErrors = ignoreHTTPSErrors;
         this.#frameManager = frameManager;
     }
     async addClient(client) {
@@ -125010,11 +126632,6 @@ class NetworkManager extends EventEmitter_js_1.EventEmitter {
             });
         }
         await Promise.all([
-            this.#ignoreHTTPSErrors
-                ? client.send('Security.setIgnoreCertificateErrors', {
-                    ignore: true,
-                })
-                : null,
             client.send('Network.enable'),
             this.#applyExtraHTTPHeaders(client),
             this.#applyNetworkConditions(client),
@@ -125509,6 +127126,7 @@ const CDPSession_js_1 = __nccwpck_require__(45639);
 const Page_js_1 = __nccwpck_require__(2194);
 const ConsoleMessage_js_1 = __nccwpck_require__(81167);
 const Errors_js_1 = __nccwpck_require__(36315);
+const EventEmitter_js_1 = __nccwpck_require__(7692);
 const FileChooser_js_1 = __nccwpck_require__(8450);
 const NetworkManagerEvents_js_1 = __nccwpck_require__(93511);
 const util_js_1 = __nccwpck_require__(78274);
@@ -125516,14 +127134,12 @@ const assert_js_1 = __nccwpck_require__(97729);
 const Deferred_js_1 = __nccwpck_require__(73791);
 const disposable_js_1 = __nccwpck_require__(97805);
 const ErrorLike_js_1 = __nccwpck_require__(32937);
-const Accessibility_js_1 = __nccwpck_require__(64721);
 const Binding_js_1 = __nccwpck_require__(32567);
 const CDPSession_js_2 = __nccwpck_require__(32711);
 const Connection_js_1 = __nccwpck_require__(94009);
 const Coverage_js_1 = __nccwpck_require__(85623);
 const Dialog_js_1 = __nccwpck_require__(19638);
 const EmulationManager_js_1 = __nccwpck_require__(56998);
-const ExecutionContext_js_1 = __nccwpck_require__(26916);
 const FirefoxTargetManager_js_1 = __nccwpck_require__(97245);
 const FrameManager_js_1 = __nccwpck_require__(67562);
 const FrameManagerEvents_js_1 = __nccwpck_require__(47081);
@@ -125545,8 +127161,8 @@ function convertConsoleMessageLevel(method) {
  * @internal
  */
 class CdpPage extends Page_js_1.Page {
-    static async _create(client, target, ignoreHTTPSErrors, defaultViewport) {
-        const page = new CdpPage(client, target, ignoreHTTPSErrors);
+    static async _create(client, target, defaultViewport) {
+        const page = new CdpPage(client, target);
         await page.#initialize();
         if (defaultViewport) {
             try {
@@ -125572,7 +127188,6 @@ class CdpPage extends Page_js_1.Page {
     #keyboard;
     #mouse;
     #touchscreen;
-    #accessibility;
     #frameManager;
     #emulationManager;
     #tracing;
@@ -125585,87 +127200,7 @@ class CdpPage extends Page_js_1.Page {
     #sessionCloseDeferred = Deferred_js_1.Deferred.create();
     #serviceWorkerBypassed = false;
     #userDragInterceptionEnabled = false;
-    #frameManagerHandlers = [
-        [
-            FrameManagerEvents_js_1.FrameManagerEvent.FrameAttached,
-            (frame) => {
-                this.emit("frameattached" /* PageEvent.FrameAttached */, frame);
-            },
-        ],
-        [
-            FrameManagerEvents_js_1.FrameManagerEvent.FrameDetached,
-            (frame) => {
-                this.emit("framedetached" /* PageEvent.FrameDetached */, frame);
-            },
-        ],
-        [
-            FrameManagerEvents_js_1.FrameManagerEvent.FrameNavigated,
-            (frame) => {
-                this.emit("framenavigated" /* PageEvent.FrameNavigated */, frame);
-            },
-        ],
-    ];
-    #networkManagerHandlers = [
-        [
-            NetworkManagerEvents_js_1.NetworkManagerEvent.Request,
-            (request) => {
-                this.emit("request" /* PageEvent.Request */, request);
-            },
-        ],
-        [
-            NetworkManagerEvents_js_1.NetworkManagerEvent.RequestServedFromCache,
-            (request) => {
-                this.emit("requestservedfromcache" /* PageEvent.RequestServedFromCache */, request);
-            },
-        ],
-        [
-            NetworkManagerEvents_js_1.NetworkManagerEvent.Response,
-            (response) => {
-                this.emit("response" /* PageEvent.Response */, response);
-            },
-        ],
-        [
-            NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFailed,
-            (request) => {
-                this.emit("requestfailed" /* PageEvent.RequestFailed */, request);
-            },
-        ],
-        [
-            NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFinished,
-            (request) => {
-                this.emit("requestfinished" /* PageEvent.RequestFinished */, request);
-            },
-        ],
-    ];
-    #sessionHandlers = [
-        [
-            CDPSession_js_1.CDPSessionEvent.Disconnected,
-            () => {
-                this.#sessionCloseDeferred.reject(new Errors_js_1.TargetCloseError('Target closed'));
-            },
-        ],
-        [
-            'Page.domContentEventFired',
-            () => {
-                return this.emit("domcontentloaded" /* PageEvent.DOMContentLoaded */, undefined);
-            },
-        ],
-        [
-            'Page.loadEventFired',
-            () => {
-                return this.emit("load" /* PageEvent.Load */, undefined);
-            },
-        ],
-        ['Runtime.consoleAPICalled', this.#onConsoleAPI.bind(this)],
-        ['Runtime.bindingCalled', this.#onBindingCalled.bind(this)],
-        ['Page.javascriptDialogOpening', this.#onDialog.bind(this)],
-        ['Runtime.exceptionThrown', this.#handleException.bind(this)],
-        ['Inspector.targetCrashed', this.#onTargetCrashed.bind(this)],
-        ['Performance.metrics', this.#emitMetrics.bind(this)],
-        ['Log.entryAdded', this.#onLogEntryAdded.bind(this)],
-        ['Page.fileChooserOpened', this.#onFileChooser.bind(this)],
-    ];
-    constructor(client, target, ignoreHTTPSErrors) {
+    constructor(client, target) {
         super();
         this.#primaryTargetClient = client;
         this.#tabTargetClient = client.parentSession();
@@ -125677,19 +127212,43 @@ class CdpPage extends Page_js_1.Page {
         this.#keyboard = new Input_js_1.CdpKeyboard(client);
         this.#mouse = new Input_js_1.CdpMouse(client, this.#keyboard);
         this.#touchscreen = new Input_js_1.CdpTouchscreen(client, this.#keyboard);
-        this.#accessibility = new Accessibility_js_1.Accessibility(client);
-        this.#frameManager = new FrameManager_js_1.FrameManager(client, this, ignoreHTTPSErrors, this._timeoutSettings);
+        this.#frameManager = new FrameManager_js_1.FrameManager(client, this, this._timeoutSettings);
         this.#emulationManager = new EmulationManager_js_1.EmulationManager(client);
         this.#tracing = new Tracing_js_1.Tracing(client);
         this.#coverage = new Coverage_js_1.Coverage(client);
         this.#viewport = null;
-        for (const [eventName, handler] of this.#frameManagerHandlers) {
-            this.#frameManager.on(eventName, handler);
-        }
-        for (const [eventName, handler] of this.#networkManagerHandlers) {
-            // TODO: Remove any.
-            this.#frameManager.networkManager.on(eventName, handler);
-        }
+        const frameManagerEmitter = new EventEmitter_js_1.EventEmitter(this.#frameManager);
+        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.FrameAttached, frame => {
+            this.emit("frameattached" /* PageEvent.FrameAttached */, frame);
+        });
+        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.FrameDetached, frame => {
+            this.emit("framedetached" /* PageEvent.FrameDetached */, frame);
+        });
+        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.FrameNavigated, frame => {
+            this.emit("framenavigated" /* PageEvent.FrameNavigated */, frame);
+        });
+        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.ConsoleApiCalled, ([world, event]) => {
+            this.#onConsoleAPI(world, event);
+        });
+        frameManagerEmitter.on(FrameManagerEvents_js_1.FrameManagerEvent.BindingCalled, ([world, event]) => {
+            void this.#onBindingCalled(world, event);
+        });
+        const networkManagerEmitter = new EventEmitter_js_1.EventEmitter(this.#frameManager.networkManager);
+        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.Request, request => {
+            this.emit("request" /* PageEvent.Request */, request);
+        });
+        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.RequestServedFromCache, request => {
+            this.emit("requestservedfromcache" /* PageEvent.RequestServedFromCache */, request);
+        });
+        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.Response, response => {
+            this.emit("response" /* PageEvent.Response */, response);
+        });
+        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFailed, request => {
+            this.emit("requestfailed" /* PageEvent.RequestFailed */, request);
+        });
+        networkManagerEmitter.on(NetworkManagerEvents_js_1.NetworkManagerEvent.RequestFinished, request => {
+            this.emit("requestfinished" /* PageEvent.RequestFinished */, request);
+        });
         this.#tabTargetClient.on(CDPSession_js_1.CDPSessionEvent.Swapped, this.#onActivation.bind(this));
         this.#tabTargetClient.on(CDPSession_js_1.CDPSessionEvent.Ready, this.#onSecondaryTarget.bind(this));
         this.#targetManager.on("targetGone" /* TargetManagerEvent.TargetGone */, this.#onDetachedFromTarget);
@@ -125702,6 +127261,25 @@ class CdpPage extends Page_js_1.Page {
         })
             .catch(util_js_1.debugError);
         this.#setupPrimaryTargetListeners();
+        this.#attachExistingTargets();
+    }
+    #attachExistingTargets() {
+        const queue = [];
+        for (const childTarget of this.#targetManager.getChildTargets(this.#primaryTarget)) {
+            queue.push(childTarget);
+        }
+        let idx = 0;
+        while (idx < queue.length) {
+            const next = queue[idx];
+            idx++;
+            const session = next._session();
+            if (session) {
+                this.#onAttachedToTarget(session);
+            }
+            for (const childTarget of this.#targetManager.getChildTargets(next)) {
+                queue.push(childTarget);
+            }
+        }
     }
     async #onActivation(newSession) {
         this.#primaryTargetClient = newSession;
@@ -125711,7 +127289,6 @@ class CdpPage extends Page_js_1.Page {
         this.#keyboard.updateClient(newSession);
         this.#mouse.updateClient(newSession);
         this.#touchscreen.updateClient(newSession);
-        this.#accessibility.updateClient(newSession);
         this.#emulationManager.updateClient(newSession);
         this.#tracing.updateClient(newSession);
         this.#coverage.updateClient(newSession);
@@ -125733,11 +127310,23 @@ class CdpPage extends Page_js_1.Page {
      * during a navigation to a prerended page.
      */
     #setupPrimaryTargetListeners() {
-        this.#primaryTargetClient.on(CDPSession_js_1.CDPSessionEvent.Ready, this.#onAttachedToTarget);
-        for (const [eventName, handler] of this.#sessionHandlers) {
-            // TODO: Remove any.
-            this.#primaryTargetClient.on(eventName, handler);
-        }
+        const clientEmitter = new EventEmitter_js_1.EventEmitter(this.#primaryTargetClient);
+        clientEmitter.on(CDPSession_js_1.CDPSessionEvent.Ready, this.#onAttachedToTarget);
+        clientEmitter.on(CDPSession_js_1.CDPSessionEvent.Disconnected, () => {
+            this.#sessionCloseDeferred.reject(new Errors_js_1.TargetCloseError('Target closed'));
+        });
+        clientEmitter.on('Page.domContentEventFired', () => {
+            this.emit("domcontentloaded" /* PageEvent.DOMContentLoaded */, undefined);
+        });
+        clientEmitter.on('Page.loadEventFired', () => {
+            this.emit("load" /* PageEvent.Load */, undefined);
+        });
+        clientEmitter.on('Page.javascriptDialogOpening', this.#onDialog.bind(this));
+        clientEmitter.on('Runtime.exceptionThrown', this.#handleException.bind(this));
+        clientEmitter.on('Inspector.targetCrashed', this.#onTargetCrashed.bind(this));
+        clientEmitter.on('Performance.metrics', this.#emitMetrics.bind(this));
+        clientEmitter.on('Log.entryAdded', this.#onLogEntryAdded.bind(this));
+        clientEmitter.on('Page.fileChooserOpened', this.#onFileChooser.bind(this));
     }
     #onDetachedFromTarget = (target) => {
         const sessionId = target._session()?.id();
@@ -125878,9 +127467,6 @@ class CdpPage extends Page_js_1.Page {
     get tracing() {
         return this.#tracing;
     }
-    get accessibility() {
-        return this.#accessibility;
-    }
     frames() {
         return this.#frameManager.frames();
     }
@@ -125921,7 +127507,9 @@ class CdpPage extends Page_js_1.Page {
         const response = await this.mainFrame().client.send('Runtime.queryObjects', {
             prototypeObjectId: prototypeHandle.id,
         });
-        return (0, ExecutionContext_js_1.createCdpHandle)(this.mainFrame().mainRealm(), response.objects);
+        return this.mainFrame()
+            .mainRealm()
+            .createCdpHandle(response.objects);
     }
     async cookies(...urls) {
         const originalCookies = (await this.#primaryTargetClient.send('Network.getCookies', {
@@ -125934,7 +127522,16 @@ class CdpPage extends Page_js_1.Page {
             }
             return cookie;
         };
-        return originalCookies.map(filterUnsupportedAttributes);
+        return originalCookies.map(filterUnsupportedAttributes).map(cookie => {
+            return {
+                ...cookie,
+                // TODO: a breaking change is needed in Puppeteer types to support other
+                // partition keys.
+                partitionKey: cookie.partitionKey
+                    ? cookie.partitionKey.topLevelSite
+                    : undefined,
+            };
+        });
     }
     async deleteCookie(...cookies) {
         const pageURL = this.url();
@@ -125961,7 +127558,19 @@ class CdpPage extends Page_js_1.Page {
         await this.deleteCookie(...items);
         if (items.length) {
             await this.#primaryTargetClient.send('Network.setCookies', {
-                cookies: items,
+                cookies: items.map(cookieParam => {
+                    return {
+                        ...cookieParam,
+                        partitionKey: cookieParam.partitionKey
+                            ? {
+                                // TODO: a breaking change neeeded to change the partition key
+                                // type in Puppeteer.
+                                topLevelSite: cookieParam.partitionKey,
+                                hasCrossSiteAncestor: false,
+                            }
+                            : undefined,
+                    };
+                }),
             });
         }
     }
@@ -125969,57 +127578,36 @@ class CdpPage extends Page_js_1.Page {
         if (this.#bindings.has(name)) {
             throw new Error(`Failed to add page binding with name ${name}: window['${name}'] already exists!`);
         }
+        const source = (0, utils_js_1.pageBindingInitString)('exposedFun', name);
         let binding;
         switch (typeof pptrFunction) {
             case 'function':
-                binding = new Binding_js_1.Binding(name, pptrFunction);
+                binding = new Binding_js_1.Binding(name, pptrFunction, source);
                 break;
             default:
-                binding = new Binding_js_1.Binding(name, pptrFunction.default);
+                binding = new Binding_js_1.Binding(name, pptrFunction.default, source);
                 break;
         }
         this.#bindings.set(name, binding);
-        const expression = (0, utils_js_1.pageBindingInitString)('exposedFun', name);
-        await this.#primaryTargetClient.send('Runtime.addBinding', { name });
-        // TODO: investigate this as it appears to only apply to the main frame and
-        // local subframes instead of the entire frame tree (including future
-        // frame).
-        const { identifier } = await this.#primaryTargetClient.send('Page.addScriptToEvaluateOnNewDocument', {
-            source: expression,
-        });
+        const [{ identifier }] = await Promise.all([
+            this.#frameManager.evaluateOnNewDocument(source),
+            this.#frameManager.addExposedFunctionBinding(binding),
+        ]);
         this.#exposedFunctions.set(name, identifier);
-        await Promise.all(this.frames().map(frame => {
-            // If a frame has not started loading, it might never start. Rely on
-            // addScriptToEvaluateOnNewDocument in that case.
-            if (frame !== this.mainFrame() && !frame._hasStartedLoading) {
-                return;
-            }
-            return frame.evaluate(expression).catch(util_js_1.debugError);
-        }));
     }
     async removeExposedFunction(name) {
-        const exposedFun = this.#exposedFunctions.get(name);
-        if (!exposedFun) {
-            throw new Error(`Failed to remove page binding with name ${name}: window['${name}'] does not exists!`);
+        const exposedFunctionId = this.#exposedFunctions.get(name);
+        if (!exposedFunctionId) {
+            throw new Error(`Function with name "${name}" does not exist`);
         }
-        await this.#primaryTargetClient.send('Runtime.removeBinding', { name });
-        await this.removeScriptToEvaluateOnNewDocument(exposedFun);
-        await Promise.all(this.frames().map(frame => {
-            // If a frame has not started loading, it might never start. Rely on
-            // addScriptToEvaluateOnNewDocument in that case.
-            if (frame !== this.mainFrame() && !frame._hasStartedLoading) {
-                return;
-            }
-            return frame
-                .evaluate(name => {
-                // Removes the dangling Puppeteer binding wrapper.
-                // @ts-expect-error: In a different context.
-                globalThis[name] = undefined;
-            }, name)
-                .catch(util_js_1.debugError);
-        }));
+        // #bindings must be updated together with #exposedFunctions.
+        const binding = this.#bindings.get(name);
         this.#exposedFunctions.delete(name);
         this.#bindings.delete(name);
+        await Promise.all([
+            this.#frameManager.removeScriptToEvaluateOnNewDocument(exposedFunctionId),
+            this.#frameManager.removeExposedFunctionBinding(binding),
+        ]);
     }
     async authenticate(credentials) {
         return await this.#frameManager.networkManager.authenticate(credentials);
@@ -126052,34 +127640,13 @@ class CdpPage extends Page_js_1.Page {
     #handleException(exception) {
         this.emit("pageerror" /* PageEvent.PageError */, (0, utils_js_1.createClientError)(exception.exceptionDetails));
     }
-    async #onConsoleAPI(event) {
-        if (event.executionContextId === 0) {
-            // DevTools protocol stores the last 1000 console messages. These
-            // messages are always reported even for removed execution contexts. In
-            // this case, they are marked with executionContextId = 0 and are
-            // reported upon enabling Runtime agent.
-            //
-            // Ignore these messages since:
-            // - there's no execution context we can use to operate with message
-            //   arguments
-            // - these messages are reported before Puppeteer clients can subscribe
-            //   to the 'console'
-            //   page event.
-            //
-            // @see https://github.com/puppeteer/puppeteer/issues/3865
-            return;
-        }
-        const context = this.#frameManager.getExecutionContextById(event.executionContextId, this.#primaryTargetClient);
-        if (!context) {
-            (0, util_js_1.debugError)(new Error(`ExecutionContext not found for a console message: ${JSON.stringify(event)}`));
-            return;
-        }
+    #onConsoleAPI(world, event) {
         const values = event.args.map(arg => {
-            return (0, ExecutionContext_js_1.createCdpHandle)(context._world, arg);
+            return world.createCdpHandle(arg);
         });
         this.#addConsoleMessage(convertConsoleMessageLevel(event.type), values, event.stackTrace);
     }
-    async #onBindingCalled(event) {
+    async #onBindingCalled(world, event) {
         let payload;
         try {
             payload = JSON.parse(event.payload);
@@ -126093,7 +127660,7 @@ class CdpPage extends Page_js_1.Page {
         if (type !== 'exposedFun') {
             return;
         }
-        const context = this.#frameManager.executionContextById(event.executionContextId, this.#primaryTargetClient);
+        const context = world.context;
         if (!context) {
             return;
         }
@@ -126209,15 +127776,10 @@ class CdpPage extends Page_js_1.Page {
     }
     async evaluateOnNewDocument(pageFunction, ...args) {
         const source = (0, util_js_1.evaluationString)(pageFunction, ...args);
-        const { identifier } = await this.#primaryTargetClient.send('Page.addScriptToEvaluateOnNewDocument', {
-            source,
-        });
-        return { identifier };
+        return await this.#frameManager.evaluateOnNewDocument(source);
     }
     async removeScriptToEvaluateOnNewDocument(identifier) {
-        await this.#primaryTargetClient.send('Page.removeScriptToEvaluateOnNewDocument', {
-            identifier,
-        });
+        return await this.#frameManager.removeScriptToEvaluateOnNewDocument(identifier);
     }
     async setCacheEnabled(enabled = true) {
         await this.#frameManager.networkManager.setCacheEnabled(enabled);
@@ -126270,15 +127832,17 @@ class CdpPage extends Page_js_1.Page {
     }
     async createPDFStream(options = {}) {
         const { timeout: ms = this._timeoutSettings.timeout() } = options;
-        const { landscape, displayHeaderFooter, headerTemplate, footerTemplate, printBackground, scale, width: paperWidth, height: paperHeight, margin, pageRanges, preferCSSPageSize, omitBackground, tagged: generateTaggedPDF, outline: generateDocumentOutline, } = (0, util_js_1.parsePDFOptions)(options);
+        const { landscape, displayHeaderFooter, headerTemplate, footerTemplate, printBackground, scale, width: paperWidth, height: paperHeight, margin, pageRanges, preferCSSPageSize, omitBackground, tagged: generateTaggedPDF, outline: generateDocumentOutline, waitForFonts, } = (0, util_js_1.parsePDFOptions)(options);
         if (omitBackground) {
             await this.#emulationManager.setTransparentBackgroundColor();
         }
-        await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.from)(this.mainFrame()
-            .isolatedRealm()
-            .evaluate(() => {
-            return document.fonts.ready;
-        })).pipe((0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms))));
+        if (waitForFonts) {
+            await (0, rxjs_js_1.firstValueFrom)((0, rxjs_js_1.from)(this.mainFrame()
+                .isolatedRealm()
+                .evaluate(() => {
+                return document.fonts.ready;
+            })).pipe((0, rxjs_js_1.raceWith)((0, util_js_1.timeout)(ms))));
+        }
         const printCommandPromise = this.#primaryTargetClient.send('Page.printToPDF', {
             transferMode: 'ReturnAsStream',
             landscape,
@@ -126313,17 +127877,28 @@ class CdpPage extends Page_js_1.Page {
         return buffer;
     }
     async close(options = { runBeforeUnload: undefined }) {
-        const connection = this.#primaryTargetClient.connection();
-        (0, assert_js_1.assert)(connection, 'Protocol error: Connection closed. Most likely the page has been closed.');
-        const runBeforeUnload = !!options.runBeforeUnload;
-        if (runBeforeUnload) {
-            await this.#primaryTargetClient.send('Page.close');
+        const env_3 = { stack: [], error: void 0, hasError: false };
+        try {
+            const _guard = __addDisposableResource(env_3, await this.browserContext().waitForScreenshotOperations(), false);
+            const connection = this.#primaryTargetClient.connection();
+            (0, assert_js_1.assert)(connection, 'Protocol error: Connection closed. Most likely the page has been closed.');
+            const runBeforeUnload = !!options.runBeforeUnload;
+            if (runBeforeUnload) {
+                await this.#primaryTargetClient.send('Page.close');
+            }
+            else {
+                await connection.send('Target.closeTarget', {
+                    targetId: this.#primaryTarget._targetId,
+                });
+                await this.#tabTarget._isClosedDeferred.valueOrThrow();
+            }
         }
-        else {
-            await connection.send('Target.closeTarget', {
-                targetId: this.#primaryTarget._targetId,
-            });
-            await this.#tabTarget._isClosedDeferred.valueOrThrow();
+        catch (e_3) {
+            env_3.error = e_3;
+            env_3.hasError = true;
+        }
+        finally {
+            __disposeResources(env_3);
         }
     }
     isClosed() {
@@ -126404,19 +127979,31 @@ function getIntersectionRect(clip, viewport) {
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.PredefinedNetworkConditions = void 0;
 /**
- * A list of network conditions to be used with
+ * A list of pre-defined network conditions to be used with
  * {@link Page.emulateNetworkConditions}.
  *
  * @example
  *
  * ```ts
  * import {PredefinedNetworkConditions} from 'puppeteer';
- * const slow3G = PredefinedNetworkConditions['Slow 3G'];
- *
  * (async () => {
  *   const browser = await puppeteer.launch();
  *   const page = await browser.newPage();
- *   await page.emulateNetworkConditions(slow3G);
+ *   await page.emulateNetworkConditions(
+ *     PredefinedNetworkConditions['Slow 3G']
+ *   );
+ *   await page.goto('https://www.google.com');
+ *   await page.emulateNetworkConditions(
+ *     PredefinedNetworkConditions['Fast 3G']
+ *   );
+ *   await page.goto('https://www.google.com');
+ *   await page.emulateNetworkConditions(
+ *     PredefinedNetworkConditions['Slow 4G']
+ *   ); // alias to Fast 3G.
+ *   await page.goto('https://www.google.com');
+ *   await page.emulateNetworkConditions(
+ *     PredefinedNetworkConditions['Fast 4G']
+ *   );
  *   await page.goto('https://www.google.com');
  *   // other actions...
  *   await browser.close();
@@ -126426,15 +128013,41 @@ exports.PredefinedNetworkConditions = void 0;
  * @public
  */
 exports.PredefinedNetworkConditions = Object.freeze({
+    // Generally aligned with DevTools
+    // https://source.chromium.org/chromium/chromium/src/+/main:third_party/devtools-frontend/src/front_end/core/sdk/NetworkManager.ts;l=398;drc=225e1240f522ca684473f541ae6dae6cd766dd33.
     'Slow 3G': {
+        // ~500Kbps down
         download: ((500 * 1000) / 8) * 0.8,
+        // ~500Kbps up
         upload: ((500 * 1000) / 8) * 0.8,
+        // 400ms RTT
         latency: 400 * 5,
     },
     'Fast 3G': {
+        // ~1.6 Mbps down
         download: ((1.6 * 1000 * 1000) / 8) * 0.9,
+        // ~0.75 Mbps up
         upload: ((750 * 1000) / 8) * 0.9,
+        // 150ms RTT
         latency: 150 * 3.75,
+    },
+    // alias to Fast 3G to align with Lighthouse (crbug.com/342406608)
+    // and DevTools (crbug.com/342406608),
+    'Slow 4G': {
+        // ~1.6 Mbps down
+        download: ((1.6 * 1000 * 1000) / 8) * 0.9,
+        // ~0.75 Mbps up
+        upload: ((750 * 1000) / 8) * 0.9,
+        // 150ms RTT
+        latency: 150 * 3.75,
+    },
+    'Fast 4G': {
+        // 9 Mbps down
+        download: ((9 * 1000 * 1000) / 8) * 0.9,
+        // 1.5 Mbps up
+        upload: ((1.5 * 1000 * 1000) / 8) * 0.9,
+        // 60ms RTT
+        latency: 60 * 2.75,
     },
 });
 //# sourceMappingURL=PredefinedNetworkConditions.js.map
@@ -126476,6 +128089,7 @@ class CdpTarget extends Target_js_1.Target {
     #targetInfo;
     #targetManager;
     #sessionFactory;
+    #childTargets = new Set();
     _initializedDeferred = Deferred_js_1.Deferred.create();
     _isClosedDeferred = Deferred_js_1.Deferred.create();
     _targetId;
@@ -126500,16 +128114,25 @@ class CdpTarget extends Target_js_1.Target {
         const session = this._session();
         if (!session) {
             return await this.createCDPSession().then(client => {
-                return Page_js_1.CdpPage._create(client, this, false, null);
+                return Page_js_1.CdpPage._create(client, this, null);
             });
         }
-        return await Page_js_1.CdpPage._create(session, this, false, null);
+        return await Page_js_1.CdpPage._create(session, this, null);
     }
     _subtype() {
         return this.#targetInfo.subtype;
     }
     _session() {
         return this.#session;
+    }
+    _addChildTarget(target) {
+        this.#childTargets.add(target);
+    }
+    _removeChildTarget(target) {
+        this.#childTargets.delete(target);
+    }
+    _childTargets() {
+        return this.#childTargets;
     }
     _sessionFactory() {
         if (!this.#sessionFactory) {
@@ -126605,10 +128228,8 @@ exports.CdpTarget = CdpTarget;
 class PageTarget extends CdpTarget {
     #defaultViewport;
     pagePromise;
-    #ignoreHTTPSErrors;
-    constructor(targetInfo, session, browserContext, targetManager, sessionFactory, ignoreHTTPSErrors, defaultViewport) {
+    constructor(targetInfo, session, browserContext, targetManager, sessionFactory, defaultViewport) {
         super(targetInfo, session, browserContext, targetManager, sessionFactory);
-        this.#ignoreHTTPSErrors = ignoreHTTPSErrors;
         this.#defaultViewport = defaultViewport ?? undefined;
     }
     _initialize() {
@@ -126642,7 +128263,7 @@ class PageTarget extends CdpTarget {
             this.pagePromise = (session
                 ? Promise.resolve(session)
                 : this._sessionFactory()(/* isAutoAttachEmulated=*/ false)).then(client => {
-                return Page_js_1.CdpPage._create(client, this, this.#ignoreHTTPSErrors, this.#defaultViewport ?? null);
+                return Page_js_1.CdpPage._create(client, this, this.#defaultViewport ?? null);
             });
         }
         return (await this.pagePromise) ?? null;
@@ -126835,6 +128456,7 @@ exports.Tracing = Tracing;
 
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.CdpWebWorker = void 0;
+const CDPSession_js_1 = __nccwpck_require__(45639);
 const Target_js_1 = __nccwpck_require__(91055);
 const WebWorker_js_1 = __nccwpck_require__(4215);
 const TimeoutSettings_js_1 = __nccwpck_require__(97258);
@@ -126859,7 +128481,7 @@ class CdpWebWorker extends WebWorker_js_1.WebWorker {
         this.#client.once('Runtime.executionContextCreated', async (event) => {
             this.#world.setContext(new ExecutionContext_js_1.ExecutionContext(client, event.context, this.#world));
         });
-        this.#client.on('Runtime.consoleAPICalled', async (event) => {
+        this.#world.emitter.on('consoleapicalled', async (event) => {
             try {
                 return consoleAPICalled(event.type, event.args.map((object) => {
                     return new JSHandle_js_1.CdpJSHandle(this.#world, object);
@@ -126870,6 +128492,9 @@ class CdpWebWorker extends WebWorker_js_1.WebWorker {
             }
         });
         this.#client.on('Runtime.exceptionThrown', exceptionThrown);
+        this.#client.once(CDPSession_js_1.CDPSessionEvent.Disconnected, () => {
+            this.#world.dispose();
+        });
         // This might fail if the target is closed before we receive all execution contexts.
         this.#client.send('Runtime.enable').catch(util_js_1.debugError);
     }
@@ -126935,7 +128560,6 @@ __exportStar(__nccwpck_require__(81129), exports);
 __exportStar(__nccwpck_require__(32567), exports);
 __exportStar(__nccwpck_require__(95282), exports);
 __exportStar(__nccwpck_require__(99170), exports);
-__exportStar(__nccwpck_require__(25924), exports);
 __exportStar(__nccwpck_require__(32711), exports);
 __exportStar(__nccwpck_require__(29343), exports);
 __exportStar(__nccwpck_require__(94009), exports);
@@ -126945,6 +128569,7 @@ __exportStar(__nccwpck_require__(19638), exports);
 __exportStar(__nccwpck_require__(28099), exports);
 __exportStar(__nccwpck_require__(56998), exports);
 __exportStar(__nccwpck_require__(26916), exports);
+__exportStar(__nccwpck_require__(16668), exports);
 __exportStar(__nccwpck_require__(97245), exports);
 __exportStar(__nccwpck_require__(29011), exports);
 __exportStar(__nccwpck_require__(67562), exports);
@@ -126981,7 +128606,7 @@ __exportStar(__nccwpck_require__(78108), exports);
  * SPDX-License-Identifier: Apache-2.0
  */
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.pageBindingInitString = exports.addPageBinding = exports.valueFromRemoteObject = exports.createClientError = exports.createEvaluationError = void 0;
+exports.pageBindingInitString = exports.CDP_BINDING_PREFIX = exports.addPageBinding = exports.valueFromRemoteObject = exports.createClientError = exports.createEvaluationError = void 0;
 const util_js_1 = __nccwpck_require__(78274);
 const assert_js_1 = __nccwpck_require__(97729);
 /**
@@ -127112,14 +128737,12 @@ exports.valueFromRemoteObject = valueFromRemoteObject;
 /**
  * @internal
  */
-function addPageBinding(type, name) {
-    // This is the CDP binding.
-    // @ts-expect-error: In a different context.
-    const callCdp = globalThis[name];
+function addPageBinding(type, name, prefix) {
     // Depending on the frame loading state either Runtime.evaluate or
     // Page.addScriptToEvaluateOnNewDocument might succeed. Let's check that we
     // don't re-wrap Puppeteer's binding.
-    if (callCdp[Symbol.toStringTag] === 'PuppeteerBinding') {
+    // @ts-expect-error: In a different context.
+    if (globalThis[name]) {
         return;
     }
     // We replace the CDP binding with a Puppeteer binding.
@@ -127133,7 +128756,9 @@ function addPageBinding(type, name) {
             const seq = (callPuppeteer.lastSeq ?? 0) + 1;
             callPuppeteer.lastSeq = seq;
             callPuppeteer.args.set(seq, args);
-            callCdp(JSON.stringify({
+            // @ts-expect-error: In a different context.
+            // Needs to be the same as CDP_BINDING_PREFIX.
+            globalThis[prefix + name](JSON.stringify({
                 type,
                 name,
                 seq,
@@ -127156,15 +128781,17 @@ function addPageBinding(type, name) {
             });
         },
     });
-    // @ts-expect-error: In a different context.
-    globalThis[name][Symbol.toStringTag] = 'PuppeteerBinding';
 }
 exports.addPageBinding = addPageBinding;
 /**
  * @internal
  */
+exports.CDP_BINDING_PREFIX = 'puppeteer_';
+/**
+ * @internal
+ */
 function pageBindingInitString(type, name) {
-    return (0, util_js_1.evaluationString)(addPageBinding, type, name);
+    return (0, util_js_1.evaluationString)(addPageBinding, type, name, exports.CDP_BINDING_PREFIX);
 }
 exports.pageBindingInitString = pageBindingInitString;
 //# sourceMappingURL=utils.js.map
@@ -127337,6 +128964,35 @@ class BrowserWebSocketTransport {
 }
 exports.BrowserWebSocketTransport = BrowserWebSocketTransport;
 //# sourceMappingURL=BrowserWebSocketTransport.js.map
+
+/***/ }),
+
+/***/ 47562:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+/**
+ * @license
+ * Copyright 2023 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.CSSQueryHandler = void 0;
+const QueryHandler_js_1 = __nccwpck_require__(53200);
+/**
+ * @internal
+ */
+class CSSQueryHandler extends QueryHandler_js_1.QueryHandler {
+    static querySelector = (element, selector, { cssQuerySelector }) => {
+        return cssQuerySelector(element, selector);
+    };
+    static querySelectorAll = (element, selector, { cssQuerySelectorAll }) => {
+        return cssQuerySelectorAll(element, selector);
+    };
+}
+exports.CSSQueryHandler = CSSQueryHandler;
+//# sourceMappingURL=CSSQueryHandler.js.map
 
 /***/ }),
 
@@ -127552,7 +129208,7 @@ class ConsoleMessage {
     #args;
     #stackTraceLocations;
     /**
-     * @public
+     * @internal
      */
     constructor(type, text, args, stackTraceLocations) {
         this.#type = type;
@@ -128825,6 +130481,198 @@ const knownDevices = [
         },
     },
     {
+        name: 'iPhone 14',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 390,
+            height: 663,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+        },
+    },
+    {
+        name: 'iPhone 14 landscape',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 750,
+            height: 340,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: true,
+        },
+    },
+    {
+        name: 'iPhone 14 Plus',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 428,
+            height: 745,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+        },
+    },
+    {
+        name: 'iPhone 14 Plus landscape',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 832,
+            height: 378,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: true,
+        },
+    },
+    {
+        name: 'iPhone 14 Pro',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 393,
+            height: 659,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+        },
+    },
+    {
+        name: 'iPhone 14 Pro landscape',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 734,
+            height: 343,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: true,
+        },
+    },
+    {
+        name: 'iPhone 14 Pro Max',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 430,
+            height: 739,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+        },
+    },
+    {
+        name: 'iPhone 14 Pro Max landscape',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 814,
+            height: 380,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: true,
+        },
+    },
+    {
+        name: 'iPhone 15',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 393,
+            height: 659,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+        },
+    },
+    {
+        name: 'iPhone 15 landscape',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 734,
+            height: 343,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: true,
+        },
+    },
+    {
+        name: 'iPhone 15 Plus',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 430,
+            height: 739,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+        },
+    },
+    {
+        name: 'iPhone 15 Plus landscape',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 814,
+            height: 380,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: true,
+        },
+    },
+    {
+        name: 'iPhone 15 Pro',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 393,
+            height: 659,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+        },
+    },
+    {
+        name: 'iPhone 15 Pro landscape',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 734,
+            height: 343,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: true,
+        },
+    },
+    {
+        name: 'iPhone 15 Pro Max',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 430,
+            height: 739,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: false,
+        },
+    },
+    {
+        name: 'iPhone 15 Pro Max landscape',
+        userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        viewport: {
+            width: 814,
+            height: 380,
+            deviceScaleFactor: 3,
+            isMobile: true,
+            hasTouch: true,
+            isLandscape: true,
+        },
+    },
+    {
         name: 'JioPhone 2',
         userAgent: 'Mozilla/5.0 (Mobile; LYF/F300B/LYF-F300B-001-01-15-130718-i;Android; rv:48.0) Gecko/48.0 Firefox/48.0 KAIOS/2.5',
         viewport: {
@@ -129328,7 +131176,7 @@ for (const device of knownDevices) {
  *
  * ```ts
  * import {KnownDevices} from 'puppeteer';
- * const iPhone = KnownDevices['iPhone 6'];
+ * const iPhone = KnownDevices['iPhone 15 Pro'];
  *
  * (async () => {
  *   const browser = await puppeteer.launch();
@@ -129456,7 +131304,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.EventSubscription = exports.EventEmitter = void 0;
+exports.EventEmitter = void 0;
 const mitt_js_1 = __importDefault(__nccwpck_require__(19020));
 const disposable_js_1 = __nccwpck_require__(97805);
 /**
@@ -129580,24 +131428,6 @@ class EventEmitter {
     }
 }
 exports.EventEmitter = EventEmitter;
-/**
- * @internal
- */
-class EventSubscription {
-    #target;
-    #type;
-    #handler;
-    constructor(target, type, handler) {
-        this.#target = target;
-        this.#type = type;
-        this.#handler = handler;
-        this.#target.on(this.#type, this.#handler);
-    }
-    [disposable_js_1.disposeSymbol]() {
-        this.#target.off(this.#type, this.#handler);
-    }
-}
-exports.EventSubscription = EventSubscription;
 //# sourceMappingURL=EventEmitter.js.map
 
 /***/ }),
@@ -129701,9 +131531,11 @@ exports.FileChooser = FileChooser;
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.getQueryHandlerAndSelector = void 0;
 const AriaQueryHandler_js_1 = __nccwpck_require__(81129);
+const CSSQueryHandler_js_1 = __nccwpck_require__(47562);
 const CustomQueryHandler_js_1 = __nccwpck_require__(95057);
 const PierceQueryHandler_js_1 = __nccwpck_require__(88198);
 const PQueryHandler_js_1 = __nccwpck_require__(43873);
+const PSelectorParser_js_1 = __nccwpck_require__(9724);
 const TextQueryHandler_js_1 = __nccwpck_require__(19374);
 const XPathQueryHandler_js_1 = __nccwpck_require__(42578);
 const BUILTIN_QUERY_HANDLERS = {
@@ -129728,12 +131560,39 @@ function getQueryHandlerAndSelector(selector) {
                 const prefix = `${name}${separator}`;
                 if (selector.startsWith(prefix)) {
                     selector = selector.slice(prefix.length);
-                    return { updatedSelector: selector, QueryHandler };
+                    return {
+                        updatedSelector: selector,
+                        polling: name === 'aria' ? "raf" /* PollingOptions.RAF */ : "mutation" /* PollingOptions.MUTATION */,
+                        QueryHandler,
+                    };
                 }
             }
         }
     }
-    return { updatedSelector: selector, QueryHandler: PQueryHandler_js_1.PQueryHandler };
+    try {
+        const [pSelector, isPureCSS, hasPseudoClasses, hasAria] = (0, PSelectorParser_js_1.parsePSelectors)(selector);
+        if (isPureCSS) {
+            return {
+                updatedSelector: selector,
+                polling: hasPseudoClasses
+                    ? "raf" /* PollingOptions.RAF */
+                    : "mutation" /* PollingOptions.MUTATION */,
+                QueryHandler: CSSQueryHandler_js_1.CSSQueryHandler,
+            };
+        }
+        return {
+            updatedSelector: JSON.stringify(pSelector),
+            polling: hasAria ? "raf" /* PollingOptions.RAF */ : "mutation" /* PollingOptions.MUTATION */,
+            QueryHandler: PQueryHandler_js_1.PQueryHandler,
+        };
+    }
+    catch {
+        return {
+            updatedSelector: selector,
+            polling: "mutation" /* PollingOptions.MUTATION */,
+            QueryHandler: CSSQueryHandler_js_1.CSSQueryHandler,
+        };
+    }
 }
 exports.getQueryHandlerAndSelector = getQueryHandlerAndSelector;
 //# sourceMappingURL=GetQueryHandler.js.map
@@ -130009,6 +131868,117 @@ class PQueryHandler extends QueryHandler_js_1.QueryHandler {
 }
 exports.PQueryHandler = PQueryHandler;
 //# sourceMappingURL=PQueryHandler.js.map
+
+/***/ }),
+
+/***/ 9724:
+/***/ ((__unused_webpack_module, exports, __nccwpck_require__) => {
+
+"use strict";
+
+/**
+ * @license
+ * Copyright 2023 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.parsePSelectors = void 0;
+const parsel_js_js_1 = __nccwpck_require__(16539);
+parsel_js_js_1.TOKENS['nesting'] = /&/g;
+parsel_js_js_1.TOKENS['combinator'] = /\s*(>>>>?|[\s>+~])\s*/g;
+const ESCAPE_REGEXP = /\\[\s\S]/g;
+const unquote = (text) => {
+    if (text.length <= 1) {
+        return text;
+    }
+    if ((text[0] === '"' || text[0] === "'") && text.endsWith(text[0])) {
+        text = text.slice(1, -1);
+    }
+    return text.replace(ESCAPE_REGEXP, match => {
+        return match[1];
+    });
+};
+/**
+ * @internal
+ */
+function parsePSelectors(selector) {
+    let isPureCSS = true;
+    let hasAria = false;
+    let hasPseudoClasses = false;
+    const tokens = (0, parsel_js_js_1.tokenize)(selector);
+    if (tokens.length === 0) {
+        return [[], isPureCSS, hasPseudoClasses, false];
+    }
+    let compoundSelector = [];
+    let complexSelector = [compoundSelector];
+    const selectors = [complexSelector];
+    const storage = [];
+    for (const token of tokens) {
+        switch (token.type) {
+            case 'combinator':
+                switch (token.content) {
+                    case ">>>" /* PCombinator.Descendent */:
+                        isPureCSS = false;
+                        if (storage.length) {
+                            compoundSelector.push((0, parsel_js_js_1.stringify)(storage));
+                            storage.splice(0);
+                        }
+                        compoundSelector = [];
+                        complexSelector.push(">>>" /* PCombinator.Descendent */);
+                        complexSelector.push(compoundSelector);
+                        continue;
+                    case ">>>>" /* PCombinator.Child */:
+                        isPureCSS = false;
+                        if (storage.length) {
+                            compoundSelector.push((0, parsel_js_js_1.stringify)(storage));
+                            storage.splice(0);
+                        }
+                        compoundSelector = [];
+                        complexSelector.push(">>>>" /* PCombinator.Child */);
+                        complexSelector.push(compoundSelector);
+                        continue;
+                }
+                break;
+            case 'pseudo-element':
+                if (!token.name.startsWith('-p-')) {
+                    break;
+                }
+                isPureCSS = false;
+                if (storage.length) {
+                    compoundSelector.push((0, parsel_js_js_1.stringify)(storage));
+                    storage.splice(0);
+                }
+                const name = token.name.slice(3);
+                if (name === 'aria') {
+                    hasAria = true;
+                }
+                compoundSelector.push({
+                    name,
+                    value: unquote(token.argument ?? ''),
+                });
+                continue;
+            case 'pseudo-class':
+                hasPseudoClasses = true;
+                break;
+            case 'comma':
+                if (storage.length) {
+                    compoundSelector.push((0, parsel_js_js_1.stringify)(storage));
+                    storage.splice(0);
+                }
+                compoundSelector = [];
+                complexSelector = [compoundSelector];
+                selectors.push(complexSelector);
+                continue;
+        }
+        storage.push(token);
+    }
+    if (storage.length) {
+        compoundSelector.push((0, parsel_js_js_1.stringify)(storage));
+    }
+    return [selectors, isPureCSS, hasPseudoClasses, hasAria];
+}
+exports.parsePSelectors = parsePSelectors;
+//# sourceMappingURL=PSelectorParser.js.map
 
 /***/ }),
 
@@ -130332,6 +132302,8 @@ class QueryHandler {
                 return await frame.isolatedRealm().adoptHandle(elementOrFrame);
             })(), false);
             const { visible = false, hidden = false, timeout, signal } = options;
+            const polling = options.polling ??
+                (visible || hidden ? "raf" /* PollingOptions.RAF */ : "mutation" /* PollingOptions.MUTATION */);
             try {
                 const env_4 = { stack: [], error: void 0, hasError: false };
                 try {
@@ -130341,7 +132313,7 @@ class QueryHandler {
                         const node = await querySelector(root ?? document, selector, PuppeteerUtil);
                         return PuppeteerUtil.checkVisibility(node, visible);
                     }, {
-                        polling: visible || hidden ? 'raf' : 'mutation',
+                        polling,
                         root: element,
                         timeout,
                         signal,
@@ -131344,6 +133316,7 @@ __exportStar(__nccwpck_require__(64302), exports);
 __exportStar(__nccwpck_require__(88198), exports);
 __exportStar(__nccwpck_require__(43873), exports);
 __exportStar(__nccwpck_require__(7023), exports);
+__exportStar(__nccwpck_require__(9724), exports);
 __exportStar(__nccwpck_require__(98435), exports);
 __exportStar(__nccwpck_require__(53200), exports);
 __exportStar(__nccwpck_require__(52379), exports);
@@ -131410,8 +133383,9 @@ var __importStar = (this && this.__importStar) || function (mod) {
     return result;
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
-exports.filterAsync = exports.fromEmitterEvent = exports.unitToPixels = exports.parsePDFOptions = exports.NETWORK_IDLE_TIME = exports.getSourceUrlComment = exports.SOURCE_URL_REGEX = exports.UTILITY_WORLD_NAME = exports.timeout = exports.validateDialogType = exports.getReadableFromProtocolStream = exports.getReadableAsBuffer = exports.importFSPromises = exports.evaluationString = exports.isDate = exports.isRegExp = exports.isPlainObject = exports.isNumber = exports.isString = exports.getSourcePuppeteerURLIfAvailable = exports.withSourcePuppeteerURLIfNone = exports.PuppeteerURL = exports.DEFAULT_VIEWPORT = exports.debugError = void 0;
+exports.filterAsync = exports.fromAbortSignal = exports.fromEmitterEvent = exports.unitToPixels = exports.parsePDFOptions = exports.NETWORK_IDLE_TIME = exports.getSourceUrlComment = exports.SOURCE_URL_REGEX = exports.UTILITY_WORLD_NAME = exports.timeout = exports.validateDialogType = exports.getReadableFromProtocolStream = exports.getReadableAsBuffer = exports.importFSPromises = exports.evaluationString = exports.isDate = exports.isRegExp = exports.isPlainObject = exports.isNumber = exports.isString = exports.getSourcePuppeteerURLIfAvailable = exports.withSourcePuppeteerURLIfNone = exports.PuppeteerURL = exports.DEFAULT_VIEWPORT = exports.debugError = void 0;
 const rxjs_js_1 = __nccwpck_require__(35006);
+const version_js_1 = __nccwpck_require__(96210);
 const assert_js_1 = __nccwpck_require__(97729);
 const Debug_js_1 = __nccwpck_require__(24090);
 const Errors_js_1 = __nccwpck_require__(36315);
@@ -131675,7 +133649,7 @@ exports.timeout = timeout;
 /**
  * @internal
  */
-exports.UTILITY_WORLD_NAME = '__puppeteer_utility_world__';
+exports.UTILITY_WORLD_NAME = '__puppeteer_utility_world__' + version_js_1.packageVersion;
 /**
  * @internal
  */
@@ -131707,6 +133681,7 @@ function parsePDFOptions(options = {}, lengthUnit = 'in') {
         omitBackground: false,
         outline: false,
         tagged: true,
+        waitForFonts: true,
     };
     let width = 8.5;
     let height = 11;
@@ -131798,6 +133773,21 @@ exports.fromEmitterEvent = fromEmitterEvent;
 /**
  * @internal
  */
+function fromAbortSignal(signal, cause) {
+    return signal
+        ? (0, rxjs_js_1.fromEvent)(signal, 'abort').pipe((0, rxjs_js_1.map)(() => {
+            if (signal.reason instanceof Error) {
+                signal.reason.cause = cause;
+                throw signal.reason;
+            }
+            throw new Error(signal.reason, { cause });
+        }))
+        : rxjs_js_1.NEVER;
+}
+exports.fromAbortSignal = fromAbortSignal;
+/**
+ * @internal
+ */
 function filterAsync(predicate) {
     return (0, rxjs_js_1.mergeMap)((value) => {
         return (0, rxjs_js_1.from)(Promise.resolve(predicate(value))).pipe((0, rxjs_js_1.filter)(isMatch => {
@@ -131846,7 +133836,7 @@ exports.source = void 0;
  *
  * @internal
  */
-exports.source = "\"use strict\";var v=Object.defineProperty;var re=Object.getOwnPropertyDescriptor;var ne=Object.getOwnPropertyNames;var oe=Object.prototype.hasOwnProperty;var u=(t,e)=>{for(var n in e)v(t,n,{get:e[n],enumerable:!0})},se=(t,e,n,r)=>{if(e&&typeof e==\"object\"||typeof e==\"function\")for(let o of ne(e))!oe.call(t,o)&&o!==n&&v(t,o,{get:()=>e[o],enumerable:!(r=re(e,o))||r.enumerable});return t};var ie=t=>se(v({},\"__esModule\",{value:!0}),t);var Re={};u(Re,{default:()=>ke});module.exports=ie(Re);var C=class extends Error{constructor(e,n){super(e,n),this.name=this.constructor.name}get[Symbol.toStringTag](){return this.constructor.name}},b=class extends C{};var f=class t{static create(e){return new t(e)}static async race(e){let n=new Set;try{let r=e.map(o=>o instanceof t?(o.#s&&n.add(o),o.valueOrThrow()):o);return await Promise.race(r)}finally{for(let r of n)r.reject(new Error(\"Timeout cleared\"))}}#e=!1;#r=!1;#n;#t;#o=new Promise(e=>{this.#t=e});#s;#l;constructor(e){e&&e.timeout>0&&(this.#l=new b(e.message),this.#s=setTimeout(()=>{this.reject(this.#l)},e.timeout))}#a(e){clearTimeout(this.#s),this.#n=e,this.#t()}resolve(e){this.#r||this.#e||(this.#e=!0,this.#a(e))}reject(e){this.#r||this.#e||(this.#r=!0,this.#a(e))}resolved(){return this.#e}finished(){return this.#e||this.#r}value(){return this.#n}#i;valueOrThrow(){return this.#i||(this.#i=(async()=>{if(await this.#o,this.#r)throw this.#n;return this.#n})()),this.#i}};var X=new Map,z=t=>{let e=X.get(t);return e||(e=new Function(`return ${t}`)(),X.set(t,e),e)};var k={};u(k,{ariaQuerySelector:()=>le,ariaQuerySelectorAll:()=>I});var le=(t,e)=>window.__ariaQuerySelector(t,e),I=async function*(t,e){yield*await window.__ariaQuerySelectorAll(t,e)};var M={};u(M,{customQuerySelectors:()=>O});var R=class{#e=new Map;register(e,n){if(!n.queryOne&&n.queryAll){let r=n.queryAll;n.queryOne=(o,i)=>{for(let s of r(o,i))return s;return null}}else if(n.queryOne&&!n.queryAll){let r=n.queryOne;n.queryAll=(o,i)=>{let s=r(o,i);return s?[s]:[]}}else if(!n.queryOne||!n.queryAll)throw new Error(\"At least one query method must be defined.\");this.#e.set(e,{querySelector:n.queryOne,querySelectorAll:n.queryAll})}unregister(e){this.#e.delete(e)}get(e){return this.#e.get(e)}clear(){this.#e.clear()}},O=new R;var q={};u(q,{pierceQuerySelector:()=>ae,pierceQuerySelectorAll:()=>ce});var ae=(t,e)=>{let n=null,r=o=>{let i=document.createTreeWalker(o,NodeFilter.SHOW_ELEMENT);do{let s=i.currentNode;s.shadowRoot&&r(s.shadowRoot),!(s instanceof ShadowRoot)&&s!==o&&!n&&s.matches(e)&&(n=s)}while(!n&&i.nextNode())};return t instanceof Document&&(t=t.documentElement),r(t),n},ce=(t,e)=>{let n=[],r=o=>{let i=document.createTreeWalker(o,NodeFilter.SHOW_ELEMENT);do{let s=i.currentNode;s.shadowRoot&&r(s.shadowRoot),!(s instanceof ShadowRoot)&&s!==o&&s.matches(e)&&n.push(s)}while(i.nextNode())};return t instanceof Document&&(t=t.documentElement),r(t),n};var m=(t,e)=>{if(!t)throw new Error(e)};var T=class{#e;#r;#n;#t;constructor(e,n){this.#e=e,this.#r=n}async start(){let e=this.#t=f.create(),n=await this.#e();if(n){e.resolve(n);return}this.#n=new MutationObserver(async()=>{let r=await this.#e();r&&(e.resolve(r),await this.stop())}),this.#n.observe(this.#r,{childList:!0,subtree:!0,attributes:!0})}async stop(){m(this.#t,\"Polling never started.\"),this.#t.finished()||this.#t.reject(new Error(\"Polling stopped\")),this.#n&&(this.#n.disconnect(),this.#n=void 0)}result(){return m(this.#t,\"Polling never started.\"),this.#t.valueOrThrow()}},E=class{#e;#r;constructor(e){this.#e=e}async start(){let e=this.#r=f.create(),n=await this.#e();if(n){e.resolve(n);return}let r=async()=>{if(e.finished())return;let o=await this.#e();if(!o){window.requestAnimationFrame(r);return}e.resolve(o),await this.stop()};window.requestAnimationFrame(r)}async stop(){m(this.#r,\"Polling never started.\"),this.#r.finished()||this.#r.reject(new Error(\"Polling stopped\"))}result(){return m(this.#r,\"Polling never started.\"),this.#r.valueOrThrow()}},P=class{#e;#r;#n;#t;constructor(e,n){this.#e=e,this.#r=n}async start(){let e=this.#t=f.create(),n=await this.#e();if(n){e.resolve(n);return}this.#n=setInterval(async()=>{let r=await this.#e();r&&(e.resolve(r),await this.stop())},this.#r)}async stop(){m(this.#t,\"Polling never started.\"),this.#t.finished()||this.#t.reject(new Error(\"Polling stopped\")),this.#n&&(clearInterval(this.#n),this.#n=void 0)}result(){return m(this.#t,\"Polling never started.\"),this.#t.valueOrThrow()}};var V={};u(V,{pQuerySelector:()=>Ce,pQuerySelectorAll:()=>te});var c=class{static async*map(e,n){for await(let r of e)yield await n(r)}static async*flatMap(e,n){for await(let r of e)yield*n(r)}static async collect(e){let n=[];for await(let r of e)n.push(r);return n}static async first(e){for await(let n of e)return n}};var p={attribute:/\\[\\s*(?:(?<namespace>\\*|[-\\w\\P{ASCII}]*)\\|)?(?<name>[-\\w\\P{ASCII}]+)\\s*(?:(?<operator>\\W?=)\\s*(?<value>.+?)\\s*(\\s(?<caseSensitive>[iIsS]))?\\s*)?\\]/gu,id:/#(?<name>[-\\w\\P{ASCII}]+)/gu,class:/\\.(?<name>[-\\w\\P{ASCII}]+)/gu,comma:/\\s*,\\s*/g,combinator:/\\s*[\\s>+~]\\s*/g,\"pseudo-element\":/::(?<name>[-\\w\\P{ASCII}]+)(?:\\((?<argument>¶*)\\))?/gu,\"pseudo-class\":/:(?<name>[-\\w\\P{ASCII}]+)(?:\\((?<argument>¶*)\\))?/gu,universal:/(?:(?<namespace>\\*|[-\\w\\P{ASCII}]*)\\|)?\\*/gu,type:/(?:(?<namespace>\\*|[-\\w\\P{ASCII}]*)\\|)?(?<name>[-\\w\\P{ASCII}]+)/gu},ue=new Set([\"combinator\",\"comma\"]);var fe=t=>{switch(t){case\"pseudo-element\":case\"pseudo-class\":return new RegExp(p[t].source.replace(\"(?<argument>\\xB6*)\",\"(?<argument>.*)\"),\"gu\");default:return p[t]}};function de(t,e){let n=0,r=\"\";for(;e<t.length;e++){let o=t[e];switch(o){case\"(\":++n;break;case\")\":--n;break}if(r+=o,n===0)return r}return r}function me(t,e=p){if(!t)return[];let n=[t];for(let[o,i]of Object.entries(e))for(let s=0;s<n.length;s++){let l=n[s];if(typeof l!=\"string\")continue;i.lastIndex=0;let a=i.exec(l);if(!a)continue;let h=a.index-1,d=[],W=a[0],H=l.slice(0,h+1);H&&d.push(H),d.push({...a.groups,type:o,content:W});let B=l.slice(h+W.length+1);B&&d.push(B),n.splice(s,1,...d)}let r=0;for(let o of n)switch(typeof o){case\"string\":throw new Error(`Unexpected sequence ${o} found at index ${r}`);case\"object\":r+=o.content.length,o.pos=[r-o.content.length,r],ue.has(o.type)&&(o.content=o.content.trim()||\" \");break}return n}var he=/(['\"])([^\\\\\\n]+?)\\1/g,pe=/\\\\./g;function G(t,e=p){if(t=t.trim(),t===\"\")return[];let n=[];t=t.replace(pe,(i,s)=>(n.push({value:i,offset:s}),\"\\uE000\".repeat(i.length))),t=t.replace(he,(i,s,l,a)=>(n.push({value:i,offset:a}),`${s}${\"\\uE001\".repeat(l.length)}${s}`));{let i=0,s;for(;(s=t.indexOf(\"(\",i))>-1;){let l=de(t,s);n.push({value:l,offset:s}),t=`${t.substring(0,s)}(${\"\\xB6\".repeat(l.length-2)})${t.substring(s+l.length)}`,i=s+l.length}}let r=me(t,e),o=new Set;for(let i of n.reverse())for(let s of r){let{offset:l,value:a}=i;if(!(s.pos[0]<=l&&l+a.length<=s.pos[1]))continue;let{content:h}=s,d=l-s.pos[0];s.content=h.slice(0,d)+a+h.slice(d+a.length),s.content!==h&&o.add(s)}for(let i of o){let s=fe(i.type);if(!s)throw new Error(`Unknown token type: ${i.type}`);s.lastIndex=0;let l=s.exec(i.content);if(!l)throw new Error(`Unable to parse content for ${i.type}: ${i.content}`);Object.assign(i,l.groups)}return r}function*x(t,e){switch(t.type){case\"list\":for(let n of t.list)yield*x(n,t);break;case\"complex\":yield*x(t.left,t),yield*x(t.right,t);break;case\"compound\":yield*t.list.map(n=>[n,t]);break;default:yield[t,e]}}function y(t){let e;return Array.isArray(t)?e=t:e=[...x(t)].map(([n])=>n),e.map(n=>n.content).join(\"\")}p.combinator=/\\s*(>>>>?|[\\s>+~])\\s*/g;var ye=/\\\\[\\s\\S]/g,ge=t=>t.length<=1?t:((t[0]==='\"'||t[0]===\"'\")&&t.endsWith(t[0])&&(t=t.slice(1,-1)),t.replace(ye,e=>e[1]));function K(t){let e=!0,n=G(t);if(n.length===0)return[[],e];let r=[],o=[r],i=[o],s=[];for(let l of n){switch(l.type){case\"combinator\":switch(l.content){case\">>>\":e=!1,s.length&&(r.push(y(s)),s.splice(0)),r=[],o.push(\">>>\"),o.push(r);continue;case\">>>>\":e=!1,s.length&&(r.push(y(s)),s.splice(0)),r=[],o.push(\">>>>\"),o.push(r);continue}break;case\"pseudo-element\":if(!l.name.startsWith(\"-p-\"))break;e=!1,s.length&&(r.push(y(s)),s.splice(0)),r.push({name:l.name.slice(3),value:ge(l.argument??\"\")});continue;case\"comma\":s.length&&(r.push(y(s)),s.splice(0)),r=[],o=[r],i.push(o);continue}s.push(l)}return s.length&&r.push(y(s)),[i,e]}var _={};u(_,{textQuerySelectorAll:()=>S});var we=new Set([\"checkbox\",\"image\",\"radio\"]),Se=t=>t instanceof HTMLSelectElement||t instanceof HTMLTextAreaElement||t instanceof HTMLInputElement&&!we.has(t.type),be=new Set([\"SCRIPT\",\"STYLE\"]),w=t=>!be.has(t.nodeName)&&!document.head?.contains(t),D=new WeakMap,J=t=>{for(;t;)D.delete(t),t instanceof ShadowRoot?t=t.host:t=t.parentNode},Y=new WeakSet,Te=new MutationObserver(t=>{for(let e of t)J(e.target)}),g=t=>{let e=D.get(t);if(e||(e={full:\"\",immediate:[]},!w(t)))return e;let n=\"\";if(Se(t))e.full=t.value,e.immediate.push(t.value),t.addEventListener(\"input\",r=>{J(r.target)},{once:!0,capture:!0});else{for(let r=t.firstChild;r;r=r.nextSibling){if(r.nodeType===Node.TEXT_NODE){e.full+=r.nodeValue??\"\",n+=r.nodeValue??\"\";continue}n&&e.immediate.push(n),n=\"\",r.nodeType===Node.ELEMENT_NODE&&(e.full+=g(r).full)}n&&e.immediate.push(n),t instanceof Element&&t.shadowRoot&&(e.full+=g(t.shadowRoot).full),Y.has(t)||(Te.observe(t,{childList:!0,characterData:!0,subtree:!0}),Y.add(t))}return D.set(t,e),e};var S=function*(t,e){let n=!1;for(let r of t.childNodes)if(r instanceof Element&&w(r)){let o;r.shadowRoot?o=S(r.shadowRoot,e):o=S(r,e);for(let i of o)yield i,n=!0}n||t instanceof Element&&w(t)&&g(t).full.includes(e)&&(yield t)};var L={};u(L,{checkVisibility:()=>Pe,pierce:()=>N,pierceAll:()=>Q});var Ee=[\"hidden\",\"collapse\"],Pe=(t,e)=>{if(!t)return e===!1;if(e===void 0)return t;let n=t.nodeType===Node.TEXT_NODE?t.parentElement:t,r=window.getComputedStyle(n),o=r&&!Ee.includes(r.visibility)&&!xe(n);return e===o?t:!1};function xe(t){let e=t.getBoundingClientRect();return e.width===0||e.height===0}var Ne=t=>\"shadowRoot\"in t&&t.shadowRoot instanceof ShadowRoot;function*N(t){Ne(t)?yield t.shadowRoot:yield t}function*Q(t){t=N(t).next().value,yield t;let e=[document.createTreeWalker(t,NodeFilter.SHOW_ELEMENT)];for(let n of e){let r;for(;r=n.nextNode();)r.shadowRoot&&(yield r.shadowRoot,e.push(document.createTreeWalker(r.shadowRoot,NodeFilter.SHOW_ELEMENT)))}}var j={};u(j,{xpathQuerySelectorAll:()=>$});var $=function*(t,e,n=-1){let o=(t.ownerDocument||document).evaluate(e,t,null,XPathResult.ORDERED_NODE_ITERATOR_TYPE),i=[],s;for(;(s=o.iterateNext())&&(i.push(s),!(n&&i.length===n)););for(let l=0;l<i.length;l++)s=i[l],yield s,delete i[l]};var Ae=/[-\\w\\P{ASCII}*]/,Z=t=>\"querySelectorAll\"in t,A=class extends Error{constructor(e,n){super(`${e} is not a valid selector: ${n}`)}},U=class{#e;#r;#n=[];#t=void 0;elements;constructor(e,n,r){this.elements=[e],this.#e=n,this.#r=r,this.#o()}async run(){if(typeof this.#t==\"string\")switch(this.#t.trimStart()){case\":scope\":this.#o();break}for(;this.#t!==void 0;this.#o()){let e=this.#t,n=this.#e;typeof e==\"string\"?e[0]&&Ae.test(e[0])?this.elements=c.flatMap(this.elements,async function*(r){Z(r)&&(yield*r.querySelectorAll(e))}):this.elements=c.flatMap(this.elements,async function*(r){if(!r.parentElement){if(!Z(r))return;yield*r.querySelectorAll(e);return}let o=0;for(let i of r.parentElement.children)if(++o,i===r)break;yield*r.parentElement.querySelectorAll(`:scope>:nth-child(${o})${e}`)}):this.elements=c.flatMap(this.elements,async function*(r){switch(e.name){case\"text\":yield*S(r,e.value);break;case\"xpath\":yield*$(r,e.value);break;case\"aria\":yield*I(r,e.value);break;default:let o=O.get(e.name);if(!o)throw new A(n,`Unknown selector type: ${e.name}`);yield*o.querySelectorAll(r,e.value)}})}}#o(){if(this.#n.length!==0){this.#t=this.#n.shift();return}if(this.#r.length===0){this.#t=void 0;return}let e=this.#r.shift();switch(e){case\">>>>\":{this.elements=c.flatMap(this.elements,N),this.#o();break}case\">>>\":{this.elements=c.flatMap(this.elements,Q),this.#o();break}default:this.#n=e,this.#o();break}}},F=class{#e=new WeakMap;calculate(e,n=[]){if(e===null)return n;e instanceof ShadowRoot&&(e=e.host);let r=this.#e.get(e);if(r)return[...r,...n];let o=0;for(let s=e.previousSibling;s;s=s.previousSibling)++o;let i=this.calculate(e.parentNode,[o]);return this.#e.set(e,i),[...i,...n]}},ee=(t,e)=>{if(t.length+e.length===0)return 0;let[n=-1,...r]=t,[o=-1,...i]=e;return n===o?ee(r,i):n<o?-1:1},ve=async function*(t){let e=new Set;for await(let r of t)e.add(r);let n=new F;yield*[...e.values()].map(r=>[r,n.calculate(r)]).sort(([,r],[,o])=>ee(r,o)).map(([r])=>r)},te=function(t,e){let n,r;try{[n,r]=K(e)}catch{return t.querySelectorAll(e)}if(r)return t.querySelectorAll(e);if(n.some(o=>{let i=0;return o.some(s=>(typeof s==\"string\"?++i:i=0,i>1))}))throw new A(e,\"Multiple deep combinators found in sequence.\");return ve(c.flatMap(n,o=>{let i=new U(t,e,o);return i.run(),i.elements}))},Ce=async function(t,e){for await(let n of te(t,e))return n;return null};var Ie=Object.freeze({...k,...M,...q,...V,..._,...L,...j,Deferred:f,createFunction:z,createTextContent:g,IntervalPoller:P,isSuitableNodeForTextMatching:w,MutationPoller:T,RAFPoller:E}),ke=Ie;\n/**\n * @license\n * Copyright 2018 Google Inc.\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2024 Google Inc.\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2023 Google Inc.\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2022 Google Inc.\n * SPDX-License-Identifier: Apache-2.0\n */\n/**\n * @license\n * Copyright 2020 Google Inc.\n * SPDX-License-Identifier: Apache-2.0\n */\n";
+exports.source = "\"use strict\";var g=Object.defineProperty;var X=Object.getOwnPropertyDescriptor;var B=Object.getOwnPropertyNames;var Y=Object.prototype.hasOwnProperty;var l=(t,e)=>{for(var r in e)g(t,r,{get:e[r],enumerable:!0})},J=(t,e,r,o)=>{if(e&&typeof e==\"object\"||typeof e==\"function\")for(let n of B(e))!Y.call(t,n)&&n!==r&&g(t,n,{get:()=>e[n],enumerable:!(o=X(e,n))||o.enumerable});return t};var z=t=>J(g({},\"__esModule\",{value:!0}),t);var pe={};l(pe,{default:()=>he});module.exports=z(pe);var N=class extends Error{constructor(e,r){super(e,r),this.name=this.constructor.name}get[Symbol.toStringTag](){return this.constructor.name}},p=class extends N{};var c=class t{static create(e){return new t(e)}static async race(e){let r=new Set;try{let o=e.map(n=>n instanceof t?(n.#n&&r.add(n),n.valueOrThrow()):n);return await Promise.race(o)}finally{for(let o of r)o.reject(new Error(\"Timeout cleared\"))}}#e=!1;#r=!1;#o;#t;#a=new Promise(e=>{this.#t=e});#n;#i;constructor(e){e&&e.timeout>0&&(this.#i=new p(e.message),this.#n=setTimeout(()=>{this.reject(this.#i)},e.timeout))}#l(e){clearTimeout(this.#n),this.#o=e,this.#t()}resolve(e){this.#r||this.#e||(this.#e=!0,this.#l(e))}reject(e){this.#r||this.#e||(this.#r=!0,this.#l(e))}resolved(){return this.#e}finished(){return this.#e||this.#r}value(){return this.#o}#s;valueOrThrow(){return this.#s||(this.#s=(async()=>{if(await this.#a,this.#r)throw this.#o;return this.#o})()),this.#s}};var L=new Map,F=t=>{let e=L.get(t);return e||(e=new Function(`return ${t}`)(),L.set(t,e),e)};var x={};l(x,{ariaQuerySelector:()=>G,ariaQuerySelectorAll:()=>b});var G=(t,e)=>globalThis.__ariaQuerySelector(t,e),b=async function*(t,e){yield*await globalThis.__ariaQuerySelectorAll(t,e)};var E={};l(E,{cssQuerySelector:()=>K,cssQuerySelectorAll:()=>Z});var K=(t,e)=>t.querySelector(e),Z=function(t,e){return t.querySelectorAll(e)};var A={};l(A,{customQuerySelectors:()=>P});var v=class{#e=new Map;register(e,r){if(!r.queryOne&&r.queryAll){let o=r.queryAll;r.queryOne=(n,i)=>{for(let s of o(n,i))return s;return null}}else if(r.queryOne&&!r.queryAll){let o=r.queryOne;r.queryAll=(n,i)=>{let s=o(n,i);return s?[s]:[]}}else if(!r.queryOne||!r.queryAll)throw new Error(\"At least one query method must be defined.\");this.#e.set(e,{querySelector:r.queryOne,querySelectorAll:r.queryAll})}unregister(e){this.#e.delete(e)}get(e){return this.#e.get(e)}clear(){this.#e.clear()}},P=new v;var R={};l(R,{pierceQuerySelector:()=>ee,pierceQuerySelectorAll:()=>te});var ee=(t,e)=>{let r=null,o=n=>{let i=document.createTreeWalker(n,NodeFilter.SHOW_ELEMENT);do{let s=i.currentNode;s.shadowRoot&&o(s.shadowRoot),!(s instanceof ShadowRoot)&&s!==n&&!r&&s.matches(e)&&(r=s)}while(!r&&i.nextNode())};return t instanceof Document&&(t=t.documentElement),o(t),r},te=(t,e)=>{let r=[],o=n=>{let i=document.createTreeWalker(n,NodeFilter.SHOW_ELEMENT);do{let s=i.currentNode;s.shadowRoot&&o(s.shadowRoot),!(s instanceof ShadowRoot)&&s!==n&&s.matches(e)&&r.push(s)}while(i.nextNode())};return t instanceof Document&&(t=t.documentElement),o(t),r};var u=(t,e)=>{if(!t)throw new Error(e)};var y=class{#e;#r;#o;#t;constructor(e,r){this.#e=e,this.#r=r}async start(){let e=this.#t=c.create(),r=await this.#e();if(r){e.resolve(r);return}this.#o=new MutationObserver(async()=>{let o=await this.#e();o&&(e.resolve(o),await this.stop())}),this.#o.observe(this.#r,{childList:!0,subtree:!0,attributes:!0})}async stop(){u(this.#t,\"Polling never started.\"),this.#t.finished()||this.#t.reject(new Error(\"Polling stopped\")),this.#o&&(this.#o.disconnect(),this.#o=void 0)}result(){return u(this.#t,\"Polling never started.\"),this.#t.valueOrThrow()}},w=class{#e;#r;constructor(e){this.#e=e}async start(){let e=this.#r=c.create(),r=await this.#e();if(r){e.resolve(r);return}let o=async()=>{if(e.finished())return;let n=await this.#e();if(!n){window.requestAnimationFrame(o);return}e.resolve(n),await this.stop()};window.requestAnimationFrame(o)}async stop(){u(this.#r,\"Polling never started.\"),this.#r.finished()||this.#r.reject(new Error(\"Polling stopped\"))}result(){return u(this.#r,\"Polling never started.\"),this.#r.valueOrThrow()}},T=class{#e;#r;#o;#t;constructor(e,r){this.#e=e,this.#r=r}async start(){let e=this.#t=c.create(),r=await this.#e();if(r){e.resolve(r);return}this.#o=setInterval(async()=>{let o=await this.#e();o&&(e.resolve(o),await this.stop())},this.#r)}async stop(){u(this.#t,\"Polling never started.\"),this.#t.finished()||this.#t.reject(new Error(\"Polling stopped\")),this.#o&&(clearInterval(this.#o),this.#o=void 0)}result(){return u(this.#t,\"Polling never started.\"),this.#t.valueOrThrow()}};var _={};l(_,{PCombinator:()=>H,pQuerySelector:()=>fe,pQuerySelectorAll:()=>$});var a=class{static async*map(e,r){for await(let o of e)yield await r(o)}static async*flatMap(e,r){for await(let o of e)yield*r(o)}static async collect(e){let r=[];for await(let o of e)r.push(o);return r}static async first(e){for await(let r of e)return r}};var C={};l(C,{textQuerySelectorAll:()=>m});var re=new Set([\"checkbox\",\"image\",\"radio\"]),oe=t=>t instanceof HTMLSelectElement||t instanceof HTMLTextAreaElement||t instanceof HTMLInputElement&&!re.has(t.type),ne=new Set([\"SCRIPT\",\"STYLE\"]),f=t=>!ne.has(t.nodeName)&&!document.head?.contains(t),I=new WeakMap,j=t=>{for(;t;)I.delete(t),t instanceof ShadowRoot?t=t.host:t=t.parentNode},W=new WeakSet,se=new MutationObserver(t=>{for(let e of t)j(e.target)}),d=t=>{let e=I.get(t);if(e||(e={full:\"\",immediate:[]},!f(t)))return e;let r=\"\";if(oe(t))e.full=t.value,e.immediate.push(t.value),t.addEventListener(\"input\",o=>{j(o.target)},{once:!0,capture:!0});else{for(let o=t.firstChild;o;o=o.nextSibling){if(o.nodeType===Node.TEXT_NODE){e.full+=o.nodeValue??\"\",r+=o.nodeValue??\"\";continue}r&&e.immediate.push(r),r=\"\",o.nodeType===Node.ELEMENT_NODE&&(e.full+=d(o).full)}r&&e.immediate.push(r),t instanceof Element&&t.shadowRoot&&(e.full+=d(t.shadowRoot).full),W.has(t)||(se.observe(t,{childList:!0,characterData:!0,subtree:!0}),W.add(t))}return I.set(t,e),e};var m=function*(t,e){let r=!1;for(let o of t.childNodes)if(o instanceof Element&&f(o)){let n;o.shadowRoot?n=m(o.shadowRoot,e):n=m(o,e);for(let i of n)yield i,r=!0}r||t instanceof Element&&f(t)&&d(t).full.includes(e)&&(yield t)};var k={};l(k,{checkVisibility:()=>le,pierce:()=>S,pierceAll:()=>O});var ie=[\"hidden\",\"collapse\"],le=(t,e)=>{if(!t)return e===!1;if(e===void 0)return t;let r=t.nodeType===Node.TEXT_NODE?t.parentElement:t,o=window.getComputedStyle(r),n=o&&!ie.includes(o.visibility)&&!ae(r);return e===n?t:!1};function ae(t){let e=t.getBoundingClientRect();return e.width===0||e.height===0}var ce=t=>\"shadowRoot\"in t&&t.shadowRoot instanceof ShadowRoot;function*S(t){ce(t)?yield t.shadowRoot:yield t}function*O(t){t=S(t).next().value,yield t;let e=[document.createTreeWalker(t,NodeFilter.SHOW_ELEMENT)];for(let r of e){let o;for(;o=r.nextNode();)o.shadowRoot&&(yield o.shadowRoot,e.push(document.createTreeWalker(o.shadowRoot,NodeFilter.SHOW_ELEMENT)))}}var Q={};l(Q,{xpathQuerySelectorAll:()=>q});var q=function*(t,e,r=-1){let n=(t.ownerDocument||document).evaluate(e,t,null,XPathResult.ORDERED_NODE_ITERATOR_TYPE),i=[],s;for(;(s=n.iterateNext())&&(i.push(s),!(r&&i.length===r)););for(let h=0;h<i.length;h++)s=i[h],yield s,delete i[h]};var ue=/[-\\w\\P{ASCII}*]/,H=(r=>(r.Descendent=\">>>\",r.Child=\">>>>\",r))(H||{}),V=t=>\"querySelectorAll\"in t,M=class{#e;#r=[];#o=void 0;elements;constructor(e,r){this.elements=[e],this.#e=r,this.#t()}async run(){if(typeof this.#o==\"string\")switch(this.#o.trimStart()){case\":scope\":this.#t();break}for(;this.#o!==void 0;this.#t()){let e=this.#o;typeof e==\"string\"?e[0]&&ue.test(e[0])?this.elements=a.flatMap(this.elements,async function*(r){V(r)&&(yield*r.querySelectorAll(e))}):this.elements=a.flatMap(this.elements,async function*(r){if(!r.parentElement){if(!V(r))return;yield*r.querySelectorAll(e);return}let o=0;for(let n of r.parentElement.children)if(++o,n===r)break;yield*r.parentElement.querySelectorAll(`:scope>:nth-child(${o})${e}`)}):this.elements=a.flatMap(this.elements,async function*(r){switch(e.name){case\"text\":yield*m(r,e.value);break;case\"xpath\":yield*q(r,e.value);break;case\"aria\":yield*b(r,e.value);break;default:let o=P.get(e.name);if(!o)throw new Error(`Unknown selector type: ${e.name}`);yield*o.querySelectorAll(r,e.value)}})}}#t(){if(this.#r.length!==0){this.#o=this.#r.shift();return}if(this.#e.length===0){this.#o=void 0;return}let e=this.#e.shift();switch(e){case\">>>>\":{this.elements=a.flatMap(this.elements,S),this.#t();break}case\">>>\":{this.elements=a.flatMap(this.elements,O),this.#t();break}default:this.#r=e,this.#t();break}}},D=class{#e=new WeakMap;calculate(e,r=[]){if(e===null)return r;e instanceof ShadowRoot&&(e=e.host);let o=this.#e.get(e);if(o)return[...o,...r];let n=0;for(let s=e.previousSibling;s;s=s.previousSibling)++n;let i=this.calculate(e.parentNode,[n]);return this.#e.set(e,i),[...i,...r]}},U=(t,e)=>{if(t.length+e.length===0)return 0;let[r=-1,...o]=t,[n=-1,...i]=e;return r===n?U(o,i):r<n?-1:1},de=async function*(t){let e=new Set;for await(let o of t)e.add(o);let r=new D;yield*[...e.values()].map(o=>[o,r.calculate(o)]).sort(([,o],[,n])=>U(o,n)).map(([o])=>o)},$=function(t,e){let r=JSON.parse(e);if(r.some(o=>{let n=0;return o.some(i=>(typeof i==\"string\"?++n:n=0,n>1))}))throw new Error(\"Multiple deep combinators found in sequence.\");return de(a.flatMap(r,o=>{let n=new M(t,o);return n.run(),n.elements}))},fe=async function(t,e){for await(let r of $(t,e))return r;return null};var me=Object.freeze({...x,...A,...R,..._,...C,...k,...Q,...E,Deferred:c,createFunction:F,createTextContent:d,IntervalPoller:T,isSuitableNodeForTextMatching:f,MutationPoller:y,RAFPoller:w}),he=me;\n";
 //# sourceMappingURL=injected.js.map
 
 /***/ }),
@@ -131861,8 +133851,77 @@ exports.packageVersion = void 0;
 /**
  * @internal
  */
-exports.packageVersion = '22.7.1';
+exports.packageVersion = '22.15.0';
 //# sourceMappingURL=version.js.map
+
+/***/ }),
+
+/***/ 97948:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__exportStar(__nccwpck_require__(51742), exports);
+__exportStar(__nccwpck_require__(25924), exports);
+__exportStar(__nccwpck_require__(73031), exports);
+__exportStar(__nccwpck_require__(12580), exports);
+__exportStar(__nccwpck_require__(51470), exports);
+/**
+ * @deprecated Use the query handler API defined on {@link Puppeteer}
+ */
+__exportStar(__nccwpck_require__(95057), exports);
+//# sourceMappingURL=index-browser.js.map
+
+/***/ }),
+
+/***/ 14560:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
+
+"use strict";
+
+/**
+ * @license
+ * Copyright 2017 Google Inc.
+ * SPDX-License-Identifier: Apache-2.0
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __exportStar = (this && this.__exportStar) || function(m, exports) {
+    for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
+};
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+__exportStar(__nccwpck_require__(97948), exports);
+__exportStar(__nccwpck_require__(61068), exports);
+//# sourceMappingURL=index.js.map
 
 /***/ }),
 
@@ -131995,10 +134054,14 @@ class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
             'AcceptCHFrame',
             'MediaRouter',
             'OptimizationHints',
-            // https://crbug.com/1492053
-            turnOnExperimentalFeaturesForTesting
-                ? ''
-                : 'ProcessPerSiteUpToMainFrameThreshold',
+            ...(turnOnExperimentalFeaturesForTesting
+                ? []
+                : [
+                    // https://crbug.com/1492053
+                    'ProcessPerSiteUpToMainFrameThreshold',
+                    // https://github.com/puppeteer/puppeteer/issues/10715
+                    'IsolateSandboxedIframes',
+                ]),
             ...userDisabledFeatures,
         ].filter(feature => {
             return feature !== '';
@@ -132009,6 +134072,7 @@ class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
         }
         // Merge default enabled features with user-provided ones, if any.
         const enabledFeatures = [
+            'PdfOopif',
             // Add features to enable by default here.
             ...userEnabledFeatures,
         ].filter(feature => {
@@ -132026,9 +134090,6 @@ class ChromeLauncher extends ProductLauncher_js_1.ProductLauncher {
             '--disable-default-apps',
             '--disable-dev-shm-usage',
             '--disable-extensions',
-            turnOnExperimentalFeaturesForTesting
-                ? ''
-                : '--disable-field-trial-config', // https://source.chromium.org/chromium/chromium/src/+/main:testing/variations/README.md
             '--disable-hang-monitor',
             '--disable-infobars',
             '--disable-ipc-flooding-protection',
@@ -132234,8 +134295,8 @@ class FirefoxLauncher extends ProductLauncher_js_1.ProductLauncher {
         });
         if (profileArgIndex !== -1) {
             userDataDir = firefoxArguments[profileArgIndex + 1];
-            if (!userDataDir || !fs_1.default.existsSync(userDataDir)) {
-                throw new Error(`Firefox profile not found at '${userDataDir}'`);
+            if (!userDataDir) {
+                throw new Error(`Missing value for profile command line argument`);
             }
             // When using a custom Firefox profile it needs to be populated
             // with required preferences.
@@ -132311,7 +134372,7 @@ class FirefoxLauncher extends ProductLauncher_js_1.ProductLauncher {
     }
     defaultArgs(options = {}) {
         const { devtools = false, headless = !devtools, args = [], userDataDir = null, } = options;
-        const firefoxArguments = ['--no-remote'];
+        const firefoxArguments = [];
         switch (os_1.default.platform()) {
             case 'darwin':
                 firefoxArguments.push('--foreground');
@@ -132385,6 +134446,8 @@ class NodeWebSocketTransport {
             const ws = new ws_1.default(url, [], {
                 followRedirects: true,
                 perMessageDeflate: false,
+                // @ts-expect-error https://github.com/websockets/ws/blob/master/doc/ws.md#new-websocketaddress-protocols-options
+                allowSynchronousEvents: false,
                 maxPayload: 256 * 1024 * 1024, // 256Mb
                 headers: {
                     'User-Agent': `Puppeteer ${version_js_1.packageVersion}`,
@@ -132403,18 +134466,14 @@ class NodeWebSocketTransport {
     constructor(ws) {
         this.#ws = ws;
         this.#ws.addEventListener('message', event => {
-            setImmediate(() => {
-                if (this.onmessage) {
-                    this.onmessage.call(null, event.data);
-                }
-            });
+            if (this.onmessage) {
+                this.onmessage.call(null, event.data);
+            }
         });
         this.#ws.addEventListener('close', () => {
-            setImmediate(() => {
-                if (this.onclose) {
-                    this.onclose.call(null);
-                }
-            });
+            if (this.onclose) {
+                this.onclose.call(null);
+            }
         });
         // Silently ignore all errors - we don't know what to do with them.
         this.#ws.addEventListener('error', () => { });
@@ -132454,16 +134513,24 @@ class PipeTransport {
     onmessage;
     constructor(pipeWrite, pipeRead) {
         this.#pipeWrite = pipeWrite;
-        this.#subscriptions.use(new EventEmitter_js_1.EventSubscription(pipeRead, 'data', (buffer) => {
+        const pipeReadEmitter = this.#subscriptions.use(
+        // NodeJS event emitters don't support `*` so we need to typecast
+        // As long as we don't use it we should be OK.
+        new EventEmitter_js_1.EventEmitter(pipeRead));
+        pipeReadEmitter.on('data', (buffer) => {
             return this.#dispatch(buffer);
-        }));
-        this.#subscriptions.use(new EventEmitter_js_1.EventSubscription(pipeRead, 'close', () => {
+        });
+        pipeReadEmitter.on('close', () => {
             if (this.onclose) {
                 this.onclose.call(null);
             }
-        }));
-        this.#subscriptions.use(new EventEmitter_js_1.EventSubscription(pipeRead, 'error', util_js_1.debugError));
-        this.#subscriptions.use(new EventEmitter_js_1.EventSubscription(pipeWrite, 'error', util_js_1.debugError));
+        });
+        pipeReadEmitter.on('error', util_js_1.debugError);
+        const pipeWriteEmitter = this.#subscriptions.use(
+        // NodeJS event emitters don't support `*` so we need to typecast
+        // As long as we don't use it we should be OK.
+        new EventEmitter_js_1.EventEmitter(pipeRead));
+        pipeWriteEmitter.on('error', util_js_1.debugError);
     }
     send(message) {
         (0, assert_js_1.assert)(!this.#isClosed, '`PipeTransport` is closed.');
@@ -132585,6 +134652,13 @@ class ProductLauncher {
                 isTemp: launchArgs.isTempUserDataDir,
             });
         };
+        if (this.#product === 'firefox' &&
+            protocol !== 'webDriverBiDi' &&
+            this.puppeteer.configuration.logLevel === 'warn') {
+            console.warn(`Chrome DevTools Protocol (CDP) support for Firefox is deprecated in Puppeteer ` +
+                `and it will be eventually removed. ` +
+                `Use WebDriver BiDi instead (see https://pptr.dev/webdriver-bidi#get-started).`);
+        }
         const browserProcess = (0, browsers_1.launch)({
             executablePath: launchArgs.executablePath,
             args: launchArgs.args,
@@ -132633,9 +134707,6 @@ class ProductLauncher {
                 }
                 if (protocol === 'webDriverBiDi') {
                     browser = await this.createBiDiOverCdpBrowser(browserProcess, cdpConnection, browserCloseCallback, {
-                        timeout,
-                        protocolTimeout,
-                        slowMo,
                         defaultViewport,
                         ignoreHTTPSErrors,
                     });
@@ -132652,7 +134723,7 @@ class ProductLauncher {
             }
             throw error;
         }
-        if (waitForInitialPage && protocol !== 'webDriverBiDi') {
+        if (waitForInitialPage) {
             await this.waitForPageTarget(browser, timeout);
         }
         return browser;
@@ -132723,13 +134794,13 @@ class ProductLauncher {
      * @internal
      */
     async createBiDiOverCdpBrowser(browserProcess, connection, closeCallback, opts) {
-        // TODO: use other options too.
         const BiDi = await Promise.resolve().then(() => __importStar(__nccwpck_require__(/* webpackIgnore: true */ 31240)));
         const bidiConnection = await BiDi.connectBidiOverCdp(connection, {
             acceptInsecureCerts: opts.ignoreHTTPSErrors ?? false,
         });
         return await BiDi.BidiBrowser.create({
             connection: bidiConnection,
+            cdpConnection: connection,
             closeCallback,
             process: browserProcess.nodeProcess,
             defaultViewport: opts.defaultViewport,
@@ -132744,7 +134815,6 @@ class ProductLauncher {
         const transport = await NodeWebSocketTransport_js_1.NodeWebSocketTransport.create(browserWSEndpoint);
         const BiDi = await Promise.resolve().then(() => __importStar(__nccwpck_require__(/* webpackIgnore: true */ 31240)));
         const bidiConnection = new BiDi.BidiConnection(browserWSEndpoint, transport, opts.slowMo, opts.protocolTimeout);
-        // TODO: use other options too.
         return await BiDi.BidiBrowser.create({
             connection: bidiConnection,
             closeCallback,
@@ -133185,7 +135255,7 @@ let ScreenRecorder = (() => {
             __esDecorate(this, null, _stop_decorators, { kind: "method", name: "stop", static: false, private: false, access: { has: obj => "stop" in obj, get: obj => obj.stop }, metadata: _metadata }, null, _instanceExtraInitializers);
             if (_metadata) Object.defineProperty(this, Symbol.metadata, { enumerable: true, configurable: true, writable: true, value: _metadata });
         }
-        #page = (__runInitializers(this, _instanceExtraInitializers), void 0);
+        #page = __runInitializers(this, _instanceExtraInitializers);
         #process;
         #controller = new AbortController();
         #lastFrame;
@@ -133429,16 +135499,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", ({ value: true }));
 exports.launch = exports.executablePath = exports.defaultArgs = exports.connect = void 0;
-__exportStar(__nccwpck_require__(51742), exports);
-__exportStar(__nccwpck_require__(25924), exports);
-__exportStar(__nccwpck_require__(73031), exports);
-__exportStar(__nccwpck_require__(61068), exports);
-__exportStar(__nccwpck_require__(12580), exports);
-__exportStar(__nccwpck_require__(51470), exports);
-/**
- * @deprecated Use the query handler API defined on {@link Puppeteer}
- */
-__exportStar(__nccwpck_require__(95057), exports);
+__exportStar(__nccwpck_require__(14560), exports);
 const PuppeteerNode_js_1 = __nccwpck_require__(74140);
 /**
  * @public
@@ -133483,8 +135544,8 @@ exports.PUPPETEER_REVISIONS = void 0;
  * @internal
  */
 exports.PUPPETEER_REVISIONS = Object.freeze({
-    chrome: '124.0.6367.78',
-    'chrome-headless-shell': '124.0.6367.78',
+    chrome: '127.0.6533.88',
+    'chrome-headless-shell': '127.0.6533.88',
     firefox: 'latest',
 });
 //# sourceMappingURL=revisions.js.map
@@ -133737,7 +135798,12 @@ function stringifyFunction(fn) {
     try {
         new Function(`(${value})`);
     }
-    catch {
+    catch (err) {
+        if (err.message.includes(`Refused to evaluate a string as JavaScript because 'unsafe-eval' is not an allowed source of script in the following Content Security Policy directive`)) {
+            // The content security policy does not allow Function eval. Let's
+            // assume the value might be valid as is.
+            return value;
+        }
         // This means we might have a function shorthand (e.g. `test(){}`). Let's
         // try prefixing.
         let prefix = 'function ';
@@ -133807,17 +135873,20 @@ const disposable_js_1 = __nccwpck_require__(97805);
 class Mutex {
     static Guard = class Guard {
         #mutex;
-        constructor(mutex) {
+        #onRelease;
+        constructor(mutex, onRelease) {
             this.#mutex = mutex;
+            this.#onRelease = onRelease;
         }
         [disposable_js_1.disposeSymbol]() {
+            this.#onRelease?.();
             return this.#mutex.release();
         }
     };
     #locked = false;
     #acquirers = [];
     // This is FIFO.
-    async acquire() {
+    async acquire(onRelease) {
         if (!this.#locked) {
             this.#locked = true;
             return new Mutex.Guard(this);
@@ -133825,7 +135894,7 @@ class Mutex {
         const deferred = Deferred_js_1.Deferred.create();
         this.#acquirers.push(deferred.resolve.bind(deferred));
         await deferred.valueOrThrow();
-        return new Mutex.Guard(this);
+        return new Mutex.Guard(this, onRelease);
     }
     release() {
         const resolve = this.#acquirers.shift();
@@ -134053,6 +136122,23 @@ function guarded(getKey = function () {
 }
 exports.guarded = guarded;
 const bubbleHandlers = new WeakMap();
+const bubbleInitializer = function (events) {
+    const handlers = bubbleHandlers.get(this) ?? new Map();
+    if (handlers.has(events)) {
+        return;
+    }
+    const handler = events !== undefined
+        ? (type, event) => {
+            if (events.includes(type)) {
+                this.emit(type, event);
+            }
+        }
+        : (type, event) => {
+            this.emit(type, event);
+        };
+    handlers.set(events, handler);
+    bubbleHandlers.set(this, handlers);
+};
 /**
  * Event emitter fields marked with `bubble` will have their events bubble up
  * the field owner.
@@ -134062,21 +136148,7 @@ const bubbleHandlers = new WeakMap();
 function bubble(events) {
     return ({ set, get }, context) => {
         context.addInitializer(function () {
-            const handlers = bubbleHandlers.get(this) ?? new Map();
-            if (handlers.has(events)) {
-                return;
-            }
-            const handler = events !== undefined
-                ? (type, event) => {
-                    if (events.includes(type)) {
-                        this.emit(type, event);
-                    }
-                }
-                : (type, event) => {
-                    this.emit(type, event);
-                };
-            handlers.set(events, handler);
-            bubbleHandlers.set(this, handlers);
+            return bubbleInitializer.apply(this, [events]);
         });
         return {
             set(emitter) {
@@ -134092,12 +136164,11 @@ function bubble(events) {
                 emitter.on('*', handler);
                 set.call(this, emitter);
             },
-            // @ts-expect-error -- TypeScript incorrectly types init to require a
-            // return.
             init(emitter) {
                 if (emitter === undefined) {
-                    return;
+                    return emitter;
                 }
+                bubbleInitializer.apply(this, [events]);
                 const handler = bubbleHandlers.get(this).get(events);
                 emitter.on('*', handler);
                 return emitter;
@@ -134464,8 +136535,7 @@ var init_mitt = __esm({
 
 // lib/cjs/third_party/mitt/mitt.js
 var __createBinding = exports && exports.__createBinding || (Object.create ? function(o, m, k, k2) {
-  if (k2 === void 0)
-    k2 = k;
+  if (k2 === void 0) k2 = k;
   var desc = Object.getOwnPropertyDescriptor(m, k);
   if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
     desc = { enumerable: true, get: function() {
@@ -134474,14 +136544,11 @@ var __createBinding = exports && exports.__createBinding || (Object.create ? fun
   }
   Object.defineProperty(o, k2, desc);
 } : function(o, m, k, k2) {
-  if (k2 === void 0)
-    k2 = k;
+  if (k2 === void 0) k2 = k;
   o[k2] = m[k];
 });
 var __exportStar = exports && exports.__exportStar || function(m, exports2) {
-  for (var p in m)
-    if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports2, p))
-      __createBinding(exports2, m, p);
+  for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports2, p)) __createBinding(exports2, m, p);
 };
 var __importDefault = exports && exports.__importDefault || function(mod) {
   return mod && mod.__esModule ? mod : { "default": mod };
@@ -134493,6 +136560,243 @@ var mitt_1 = (init_mitt(), __toCommonJS(mitt_exports));
 Object.defineProperty(exports, "default", ({ enumerable: true, get: function() {
   return __importDefault(mitt_1).default;
 } }));
+
+
+/***/ }),
+
+/***/ 16539:
+/***/ ((module) => {
+
+"use strict";
+/**
+MIT License
+
+Copyright (c) 2020 Lea Verou
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+*/
+
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// lib/cjs/third_party/parsel-js/parsel-js.js
+var parsel_js_exports = {};
+__export(parsel_js_exports, {
+  TOKENS: () => TOKENS,
+  stringify: () => stringify,
+  tokenize: () => tokenize
+});
+module.exports = __toCommonJS(parsel_js_exports);
+
+// ../../node_modules/parsel-js/dist/parsel.js
+var TOKENS = {
+  attribute: /\[\s*(?:(?<namespace>\*|[-\w\P{ASCII}]*)\|)?(?<name>[-\w\P{ASCII}]+)\s*(?:(?<operator>\W?=)\s*(?<value>.+?)\s*(\s(?<caseSensitive>[iIsS]))?\s*)?\]/gu,
+  id: /#(?<name>[-\w\P{ASCII}]+)/gu,
+  class: /\.(?<name>[-\w\P{ASCII}]+)/gu,
+  comma: /\s*,\s*/g,
+  combinator: /\s*[\s>+~]\s*/g,
+  "pseudo-element": /::(?<name>[-\w\P{ASCII}]+)(?:\((?<argument>¶*)\))?/gu,
+  "pseudo-class": /:(?<name>[-\w\P{ASCII}]+)(?:\((?<argument>¶*)\))?/gu,
+  universal: /(?:(?<namespace>\*|[-\w\P{ASCII}]*)\|)?\*/gu,
+  type: /(?:(?<namespace>\*|[-\w\P{ASCII}]*)\|)?(?<name>[-\w\P{ASCII}]+)/gu
+  // this must be last
+};
+var TRIM_TOKENS = /* @__PURE__ */ new Set(["combinator", "comma"]);
+var getArgumentPatternByType = (type) => {
+  switch (type) {
+    case "pseudo-element":
+    case "pseudo-class":
+      return new RegExp(TOKENS[type].source.replace("(?<argument>\xB6*)", "(?<argument>.*)"), "gu");
+    default:
+      return TOKENS[type];
+  }
+};
+function gobbleParens(text, offset) {
+  let nesting = 0;
+  let result = "";
+  for (; offset < text.length; offset++) {
+    const char = text[offset];
+    switch (char) {
+      case "(":
+        ++nesting;
+        break;
+      case ")":
+        --nesting;
+        break;
+    }
+    result += char;
+    if (nesting === 0) {
+      return result;
+    }
+  }
+  return result;
+}
+function tokenizeBy(text, grammar = TOKENS) {
+  if (!text) {
+    return [];
+  }
+  const tokens = [text];
+  for (const [type, pattern] of Object.entries(grammar)) {
+    for (let i = 0; i < tokens.length; i++) {
+      const token = tokens[i];
+      if (typeof token !== "string") {
+        continue;
+      }
+      pattern.lastIndex = 0;
+      const match = pattern.exec(token);
+      if (!match) {
+        continue;
+      }
+      const from = match.index - 1;
+      const args = [];
+      const content = match[0];
+      const before = token.slice(0, from + 1);
+      if (before) {
+        args.push(before);
+      }
+      args.push({
+        ...match.groups,
+        type,
+        content
+      });
+      const after = token.slice(from + content.length + 1);
+      if (after) {
+        args.push(after);
+      }
+      tokens.splice(i, 1, ...args);
+    }
+  }
+  let offset = 0;
+  for (const token of tokens) {
+    switch (typeof token) {
+      case "string":
+        throw new Error(`Unexpected sequence ${token} found at index ${offset}`);
+      case "object":
+        offset += token.content.length;
+        token.pos = [offset - token.content.length, offset];
+        if (TRIM_TOKENS.has(token.type)) {
+          token.content = token.content.trim() || " ";
+        }
+        break;
+    }
+  }
+  return tokens;
+}
+var STRING_PATTERN = /(['"])([^\\\n]+?)\1/g;
+var ESCAPE_PATTERN = /\\./g;
+function tokenize(selector, grammar = TOKENS) {
+  selector = selector.trim();
+  if (selector === "") {
+    return [];
+  }
+  const replacements = [];
+  selector = selector.replace(ESCAPE_PATTERN, (value, offset) => {
+    replacements.push({ value, offset });
+    return "\uE000".repeat(value.length);
+  });
+  selector = selector.replace(STRING_PATTERN, (value, quote, content, offset) => {
+    replacements.push({ value, offset });
+    return `${quote}${"\uE001".repeat(content.length)}${quote}`;
+  });
+  {
+    let pos = 0;
+    let offset;
+    while ((offset = selector.indexOf("(", pos)) > -1) {
+      const value = gobbleParens(selector, offset);
+      replacements.push({ value, offset });
+      selector = `${selector.substring(0, offset)}(${"\xB6".repeat(value.length - 2)})${selector.substring(offset + value.length)}`;
+      pos = offset + value.length;
+    }
+  }
+  const tokens = tokenizeBy(selector, grammar);
+  const changedTokens = /* @__PURE__ */ new Set();
+  for (const replacement of replacements.reverse()) {
+    for (const token of tokens) {
+      const { offset, value } = replacement;
+      if (!(token.pos[0] <= offset && offset + value.length <= token.pos[1])) {
+        continue;
+      }
+      const { content } = token;
+      const tokenOffset = offset - token.pos[0];
+      token.content = content.slice(0, tokenOffset) + value + content.slice(tokenOffset + value.length);
+      if (token.content !== content) {
+        changedTokens.add(token);
+      }
+    }
+  }
+  for (const token of changedTokens) {
+    const pattern = getArgumentPatternByType(token.type);
+    if (!pattern) {
+      throw new Error(`Unknown token type: ${token.type}`);
+    }
+    pattern.lastIndex = 0;
+    const match = pattern.exec(token.content);
+    if (!match) {
+      throw new Error(`Unable to parse content for ${token.type}: ${token.content}`);
+    }
+    Object.assign(token, match.groups);
+  }
+  return tokens;
+}
+function* flatten(node, parent) {
+  switch (node.type) {
+    case "list":
+      for (let child of node.list) {
+        yield* flatten(child, node);
+      }
+      break;
+    case "complex":
+      yield* flatten(node.left, node);
+      yield* flatten(node.right, node);
+      break;
+    case "compound":
+      yield* node.list.map((token) => [token, node]);
+      break;
+    default:
+      yield [node, parent];
+  }
+}
+function stringify(listOrNode) {
+  let tokens;
+  if (Array.isArray(listOrNode)) {
+    tokens = listOrNode;
+  } else {
+    tokens = [...flatten(listOrNode)].map(([token]) => token);
+  }
+  return tokens.map((token) => token.content).join("");
+}
 
 
 /***/ }),
@@ -134787,35 +137091,28 @@ var require_Subscription = __commonJS({
     "use strict";
     var __values = exports2 && exports2.__values || function(o) {
       var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-      if (m)
-        return m.call(o);
-      if (o && typeof o.length === "number")
-        return {
-          next: function() {
-            if (o && i >= o.length)
-              o = void 0;
-            return { value: o && o[i++], done: !o };
-          }
-        };
+      if (m) return m.call(o);
+      if (o && typeof o.length === "number") return {
+        next: function() {
+          if (o && i >= o.length) o = void 0;
+          return { value: o && o[i++], done: !o };
+        }
+      };
       throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
     };
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -134855,11 +137152,9 @@ var require_Subscription = __commonJS({
                 e_1 = { error: e_1_1 };
               } finally {
                 try {
-                  if (_parentage_1_1 && !_parentage_1_1.done && (_a = _parentage_1.return))
-                    _a.call(_parentage_1);
+                  if (_parentage_1_1 && !_parentage_1_1.done && (_a = _parentage_1.return)) _a.call(_parentage_1);
                 } finally {
-                  if (e_1)
-                    throw e_1.error;
+                  if (e_1) throw e_1.error;
                 }
               }
             } else {
@@ -134895,11 +137190,9 @@ var require_Subscription = __commonJS({
               e_2 = { error: e_2_1 };
             } finally {
               try {
-                if (_finalizers_1_1 && !_finalizers_1_1.done && (_b = _finalizers_1.return))
-                  _b.call(_finalizers_1);
+                if (_finalizers_1_1 && !_finalizers_1_1.done && (_b = _finalizers_1.return)) _b.call(_finalizers_1);
               } finally {
-                if (e_2)
-                  throw e_2.error;
+                if (e_2) throw e_2.error;
               }
             }
           }
@@ -134992,21 +137285,17 @@ var require_timeoutProvider = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -135147,9 +137436,7 @@ var require_Subscriber = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -135543,9 +137830,7 @@ var require_OperatorSubscriber = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -135657,9 +137942,7 @@ var require_ConnectableObservable = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -135762,21 +138045,17 @@ var require_animationFrameProvider = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -135896,9 +138175,7 @@ var require_Subject = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -135914,16 +138191,13 @@ var require_Subject = __commonJS({
     }();
     var __values = exports2 && exports2.__values || function(o) {
       var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-      if (m)
-        return m.call(o);
-      if (o && typeof o.length === "number")
-        return {
-          next: function() {
-            if (o && i >= o.length)
-              o = void 0;
-            return { value: o && o[i++], done: !o };
-          }
-        };
+      if (m) return m.call(o);
+      if (o && typeof o.length === "number") return {
+        next: function() {
+          if (o && i >= o.length) o = void 0;
+          return { value: o && o[i++], done: !o };
+        }
+      };
       throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -135973,11 +138247,9 @@ var require_Subject = __commonJS({
               e_1 = { error: e_1_1 };
             } finally {
               try {
-                if (_c && !_c.done && (_a = _b.return))
-                  _a.call(_b);
+                if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
               } finally {
-                if (e_1)
-                  throw e_1.error;
+                if (e_1) throw e_1.error;
               }
             }
           }
@@ -136102,9 +138374,7 @@ var require_BehaviorSubject = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -136181,9 +138451,7 @@ var require_ReplaySubject = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -136273,9 +138541,7 @@ var require_AsyncSubject = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -136339,9 +138605,7 @@ var require_Action = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -136381,21 +138645,17 @@ var require_intervalProvider = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -136437,9 +138697,7 @@ var require_AsyncAction = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -136596,21 +138854,17 @@ var require_immediateProvider = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -136652,9 +138906,7 @@ var require_AsapAction = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -136750,9 +139002,7 @@ var require_AsyncScheduler = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -136816,9 +139066,7 @@ var require_AsapScheduler = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -136901,9 +139149,7 @@ var require_QueueAction = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -136968,9 +139214,7 @@ var require_QueueScheduler = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -137020,9 +139264,7 @@ var require_AnimationFrameAction = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -137090,9 +139332,7 @@ var require_AnimationFrameScheduler = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -137162,9 +139402,7 @@ var require_VirtualTimeScheduler = __commonJS({
         extendStatics = Object.setPrototypeOf || { __proto__: [] } instanceof Array && function(d2, b2) {
           d2.__proto__ = b2;
         } || function(d2, b2) {
-          for (var p in b2)
-            if (Object.prototype.hasOwnProperty.call(b2, p))
-              d2[p] = b2[p];
+          for (var p in b2) if (Object.prototype.hasOwnProperty.call(b2, p)) d2[p] = b2[p];
         };
         return extendStatics(d, b);
       };
@@ -137464,8 +139702,7 @@ var require_isReadableStreamLike = __commonJS({
     "use strict";
     var __generator = exports2 && exports2.__generator || function(thisArg, body) {
       var _ = { label: 0, sent: function() {
-        if (t[0] & 1)
-          throw t[1];
+        if (t[0] & 1) throw t[1];
         return t[1];
       }, trys: [], ops: [] }, f, y, t, g;
       return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
@@ -137477,64 +139714,58 @@ var require_isReadableStreamLike = __commonJS({
         };
       }
       function step(op) {
-        if (f)
-          throw new TypeError("Generator is already executing.");
-        while (_)
-          try {
-            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done)
-              return t;
-            if (y = 0, t)
-              op = [op[0] & 2, t.value];
-            switch (op[0]) {
-              case 0:
-              case 1:
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+          if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+          if (y = 0, t) op = [op[0] & 2, t.value];
+          switch (op[0]) {
+            case 0:
+            case 1:
+              t = op;
+              break;
+            case 4:
+              _.label++;
+              return { value: op[1], done: false };
+            case 5:
+              _.label++;
+              y = op[1];
+              op = [0];
+              continue;
+            case 7:
+              op = _.ops.pop();
+              _.trys.pop();
+              continue;
+            default:
+              if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+                _ = 0;
+                continue;
+              }
+              if (op[0] === 3 && (!t || op[1] > t[0] && op[1] < t[3])) {
+                _.label = op[1];
+                break;
+              }
+              if (op[0] === 6 && _.label < t[1]) {
+                _.label = t[1];
                 t = op;
                 break;
-              case 4:
-                _.label++;
-                return { value: op[1], done: false };
-              case 5:
-                _.label++;
-                y = op[1];
-                op = [0];
-                continue;
-              case 7:
-                op = _.ops.pop();
-                _.trys.pop();
-                continue;
-              default:
-                if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) {
-                  _ = 0;
-                  continue;
-                }
-                if (op[0] === 3 && (!t || op[1] > t[0] && op[1] < t[3])) {
-                  _.label = op[1];
-                  break;
-                }
-                if (op[0] === 6 && _.label < t[1]) {
-                  _.label = t[1];
-                  t = op;
-                  break;
-                }
-                if (t && _.label < t[2]) {
-                  _.label = t[2];
-                  _.ops.push(op);
-                  break;
-                }
-                if (t[2])
-                  _.ops.pop();
-                _.trys.pop();
-                continue;
-            }
-            op = body.call(thisArg, _);
-          } catch (e) {
-            op = [6, e];
-            y = 0;
-          } finally {
-            f = t = 0;
+              }
+              if (t && _.label < t[2]) {
+                _.label = t[2];
+                _.ops.push(op);
+                break;
+              }
+              if (t[2]) _.ops.pop();
+              _.trys.pop();
+              continue;
           }
-        if (op[0] & 5)
-          throw op[1];
+          op = body.call(thisArg, _);
+        } catch (e) {
+          op = [6, e];
+          y = 0;
+        } finally {
+          f = t = 0;
+        }
+        if (op[0] & 5) throw op[1];
         return { value: op[0] ? op[1] : void 0, done: true };
       }
     };
@@ -137542,19 +139773,17 @@ var require_isReadableStreamLike = __commonJS({
       return this instanceof __await ? (this.v = v, this) : new __await(v);
     };
     var __asyncGenerator = exports2 && exports2.__asyncGenerator || function(thisArg, _arguments, generator) {
-      if (!Symbol.asyncIterator)
-        throw new TypeError("Symbol.asyncIterator is not defined.");
+      if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
       var g = generator.apply(thisArg, _arguments || []), i, q = [];
       return i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function() {
         return this;
       }, i;
       function verb(n) {
-        if (g[n])
-          i[n] = function(v) {
-            return new Promise(function(a, b) {
-              q.push([n, v, a, b]) > 1 || resume(n, v);
-            });
-          };
+        if (g[n]) i[n] = function(v) {
+          return new Promise(function(a, b) {
+            q.push([n, v, a, b]) > 1 || resume(n, v);
+          });
+        };
       }
       function resume(n, v) {
         try {
@@ -137573,8 +139802,7 @@ var require_isReadableStreamLike = __commonJS({
         resume("throw", value);
       }
       function settle(f, v) {
-        if (f(v), q.shift(), q.length)
-          resume(q[0][0], q[0][1]);
+        if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]);
       }
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -137592,13 +139820,11 @@ var require_isReadableStreamLike = __commonJS({
               _b.trys.push([1, , 9, 10]);
               _b.label = 2;
             case 2:
-              if (false)
-                {}
+              if (false) {}
               return [4, __await(reader.read())];
             case 3:
               _a = _b.sent(), value = _a.value, done = _a.done;
-              if (!done)
-                return [3, 5];
+              if (!done) return [3, 5];
               return [4, __await(void 0)];
             case 4:
               return [2, _b.sent()];
@@ -137661,8 +139887,7 @@ var require_innerFrom = __commonJS({
     };
     var __generator = exports2 && exports2.__generator || function(thisArg, body) {
       var _ = { label: 0, sent: function() {
-        if (t[0] & 1)
-          throw t[1];
+        if (t[0] & 1) throw t[1];
         return t[1];
       }, trys: [], ops: [] }, f, y, t, g;
       return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
@@ -137674,70 +139899,63 @@ var require_innerFrom = __commonJS({
         };
       }
       function step(op) {
-        if (f)
-          throw new TypeError("Generator is already executing.");
-        while (_)
-          try {
-            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done)
-              return t;
-            if (y = 0, t)
-              op = [op[0] & 2, t.value];
-            switch (op[0]) {
-              case 0:
-              case 1:
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+          if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+          if (y = 0, t) op = [op[0] & 2, t.value];
+          switch (op[0]) {
+            case 0:
+            case 1:
+              t = op;
+              break;
+            case 4:
+              _.label++;
+              return { value: op[1], done: false };
+            case 5:
+              _.label++;
+              y = op[1];
+              op = [0];
+              continue;
+            case 7:
+              op = _.ops.pop();
+              _.trys.pop();
+              continue;
+            default:
+              if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+                _ = 0;
+                continue;
+              }
+              if (op[0] === 3 && (!t || op[1] > t[0] && op[1] < t[3])) {
+                _.label = op[1];
+                break;
+              }
+              if (op[0] === 6 && _.label < t[1]) {
+                _.label = t[1];
                 t = op;
                 break;
-              case 4:
-                _.label++;
-                return { value: op[1], done: false };
-              case 5:
-                _.label++;
-                y = op[1];
-                op = [0];
-                continue;
-              case 7:
-                op = _.ops.pop();
-                _.trys.pop();
-                continue;
-              default:
-                if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) {
-                  _ = 0;
-                  continue;
-                }
-                if (op[0] === 3 && (!t || op[1] > t[0] && op[1] < t[3])) {
-                  _.label = op[1];
-                  break;
-                }
-                if (op[0] === 6 && _.label < t[1]) {
-                  _.label = t[1];
-                  t = op;
-                  break;
-                }
-                if (t && _.label < t[2]) {
-                  _.label = t[2];
-                  _.ops.push(op);
-                  break;
-                }
-                if (t[2])
-                  _.ops.pop();
-                _.trys.pop();
-                continue;
-            }
-            op = body.call(thisArg, _);
-          } catch (e) {
-            op = [6, e];
-            y = 0;
-          } finally {
-            f = t = 0;
+              }
+              if (t && _.label < t[2]) {
+                _.label = t[2];
+                _.ops.push(op);
+                break;
+              }
+              if (t[2]) _.ops.pop();
+              _.trys.pop();
+              continue;
           }
-        if (op[0] & 5)
-          throw op[1];
+          op = body.call(thisArg, _);
+        } catch (e) {
+          op = [6, e];
+          y = 0;
+        } finally {
+          f = t = 0;
+        }
+        if (op[0] & 5) throw op[1];
         return { value: op[0] ? op[1] : void 0, done: true };
       }
     };
     var __asyncValues = exports2 && exports2.__asyncValues || function(o) {
-      if (!Symbol.asyncIterator)
-        throw new TypeError("Symbol.asyncIterator is not defined.");
+      if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
       var m = o[Symbol.asyncIterator], i;
       return m ? m.call(o) : (o = typeof __values === "function" ? __values(o) : o[Symbol.iterator](), i = {}, verb("next"), verb("throw"), verb("return"), i[Symbol.asyncIterator] = function() {
         return this;
@@ -137757,16 +139975,13 @@ var require_innerFrom = __commonJS({
     };
     var __values = exports2 && exports2.__values || function(o) {
       var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-      if (m)
-        return m.call(o);
-      if (o && typeof o.length === "number")
-        return {
-          next: function() {
-            if (o && i >= o.length)
-              o = void 0;
-            return { value: o && o[i++], done: !o };
-          }
-        };
+      if (m) return m.call(o);
+      if (o && typeof o.length === "number") return {
+        next: function() {
+          if (o && i >= o.length) o = void 0;
+          return { value: o && o[i++], done: !o };
+        }
+      };
       throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -137856,11 +140071,9 @@ var require_innerFrom = __commonJS({
           e_1 = { error: e_1_1 };
         } finally {
           try {
-            if (iterable_1_1 && !iterable_1_1.done && (_a = iterable_1.return))
-              _a.call(iterable_1);
+            if (iterable_1_1 && !iterable_1_1.done && (_a = iterable_1.return)) _a.call(iterable_1);
           } finally {
-            if (e_1)
-              throw e_1.error;
+            if (e_1) throw e_1.error;
           }
         }
         subscriber.complete();
@@ -137893,8 +140106,7 @@ var require_innerFrom = __commonJS({
             case 1:
               return [4, asyncIterable_1.next()];
             case 2:
-              if (!(asyncIterable_1_1 = _b.sent(), !asyncIterable_1_1.done))
-                return [3, 4];
+              if (!(asyncIterable_1_1 = _b.sent(), !asyncIterable_1_1.done)) return [3, 4];
               value = asyncIterable_1_1.value;
               subscriber.next(value);
               if (subscriber.closed) {
@@ -137911,8 +140123,7 @@ var require_innerFrom = __commonJS({
               return [3, 11];
             case 6:
               _b.trys.push([6, , 9, 10]);
-              if (!(asyncIterable_1_1 && !asyncIterable_1_1.done && (_a = asyncIterable_1.return)))
-                return [3, 8];
+              if (!(asyncIterable_1_1 && !asyncIterable_1_1.done && (_a = asyncIterable_1.return))) return [3, 8];
               return [4, _a.call(asyncIterable_1)];
             case 7:
               _b.sent();
@@ -137920,8 +140131,7 @@ var require_innerFrom = __commonJS({
             case 8:
               return [3, 10];
             case 9:
-              if (e_2)
-                throw e_2.error;
+              if (e_2) throw e_2.error;
               return [7];
             case 10:
               return [7];
@@ -138594,21 +140804,17 @@ var require_mapOneOrManyArgs = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -138640,21 +140846,17 @@ var require_bindCallbackInternals = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -139179,21 +141381,17 @@ var require_fromEvent = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -139303,8 +141501,7 @@ var require_generate = __commonJS({
     "use strict";
     var __generator = exports2 && exports2.__generator || function(thisArg, body) {
       var _ = { label: 0, sent: function() {
-        if (t[0] & 1)
-          throw t[1];
+        if (t[0] & 1) throw t[1];
         return t[1];
       }, trys: [], ops: [] }, f, y, t, g;
       return g = { next: verb(0), "throw": verb(1), "return": verb(2) }, typeof Symbol === "function" && (g[Symbol.iterator] = function() {
@@ -139316,64 +141513,58 @@ var require_generate = __commonJS({
         };
       }
       function step(op) {
-        if (f)
-          throw new TypeError("Generator is already executing.");
-        while (_)
-          try {
-            if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done)
-              return t;
-            if (y = 0, t)
-              op = [op[0] & 2, t.value];
-            switch (op[0]) {
-              case 0:
-              case 1:
+        if (f) throw new TypeError("Generator is already executing.");
+        while (_) try {
+          if (f = 1, y && (t = op[0] & 2 ? y["return"] : op[0] ? y["throw"] || ((t = y["return"]) && t.call(y), 0) : y.next) && !(t = t.call(y, op[1])).done) return t;
+          if (y = 0, t) op = [op[0] & 2, t.value];
+          switch (op[0]) {
+            case 0:
+            case 1:
+              t = op;
+              break;
+            case 4:
+              _.label++;
+              return { value: op[1], done: false };
+            case 5:
+              _.label++;
+              y = op[1];
+              op = [0];
+              continue;
+            case 7:
+              op = _.ops.pop();
+              _.trys.pop();
+              continue;
+            default:
+              if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) {
+                _ = 0;
+                continue;
+              }
+              if (op[0] === 3 && (!t || op[1] > t[0] && op[1] < t[3])) {
+                _.label = op[1];
+                break;
+              }
+              if (op[0] === 6 && _.label < t[1]) {
+                _.label = t[1];
                 t = op;
                 break;
-              case 4:
-                _.label++;
-                return { value: op[1], done: false };
-              case 5:
-                _.label++;
-                y = op[1];
-                op = [0];
-                continue;
-              case 7:
-                op = _.ops.pop();
-                _.trys.pop();
-                continue;
-              default:
-                if (!(t = _.trys, t = t.length > 0 && t[t.length - 1]) && (op[0] === 6 || op[0] === 2)) {
-                  _ = 0;
-                  continue;
-                }
-                if (op[0] === 3 && (!t || op[1] > t[0] && op[1] < t[3])) {
-                  _.label = op[1];
-                  break;
-                }
-                if (op[0] === 6 && _.label < t[1]) {
-                  _.label = t[1];
-                  t = op;
-                  break;
-                }
-                if (t && _.label < t[2]) {
-                  _.label = t[2];
-                  _.ops.push(op);
-                  break;
-                }
-                if (t[2])
-                  _.ops.pop();
-                _.trys.pop();
-                continue;
-            }
-            op = body.call(thisArg, _);
-          } catch (e) {
-            op = [6, e];
-            y = 0;
-          } finally {
-            f = t = 0;
+              }
+              if (t && _.label < t[2]) {
+                _.label = t[2];
+                _.ops.push(op);
+                break;
+              }
+              if (t[2]) _.ops.pop();
+              _.trys.pop();
+              continue;
           }
-        if (op[0] & 5)
-          throw op[1];
+          op = body.call(thisArg, _);
+        } catch (e) {
+          op = [6, e];
+          y = 0;
+        } finally {
+          f = t = 0;
+        }
+        if (op[0] & 5) throw op[1];
         return { value: op[0] ? op[1] : void 0, done: true };
       }
     };
@@ -139406,8 +141597,7 @@ var require_generate = __commonJS({
               state = initialState;
               _a2.label = 1;
             case 1:
-              if (!(!condition || condition(state)))
-                return [3, 4];
+              if (!(!condition || condition(state))) return [3, 4];
               return [4, resultSelector(state)];
             case 2:
               _a2.sent();
@@ -139790,21 +141980,17 @@ var require_zip = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -139986,16 +142172,13 @@ var require_bufferCount = __commonJS({
     "use strict";
     var __values = exports2 && exports2.__values || function(o) {
       var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-      if (m)
-        return m.call(o);
-      if (o && typeof o.length === "number")
-        return {
-          next: function() {
-            if (o && i >= o.length)
-              o = void 0;
-            return { value: o && o[i++], done: !o };
-          }
-        };
+      if (m) return m.call(o);
+      if (o && typeof o.length === "number") return {
+        next: function() {
+          if (o && i >= o.length) o = void 0;
+          return { value: o && o[i++], done: !o };
+        }
+      };
       throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -140030,11 +142213,9 @@ var require_bufferCount = __commonJS({
             e_1 = { error: e_1_1 };
           } finally {
             try {
-              if (buffers_1_1 && !buffers_1_1.done && (_a = buffers_1.return))
-                _a.call(buffers_1);
+              if (buffers_1_1 && !buffers_1_1.done && (_a = buffers_1.return)) _a.call(buffers_1);
             } finally {
-              if (e_1)
-                throw e_1.error;
+              if (e_1) throw e_1.error;
             }
           }
           if (toEmit) {
@@ -140048,11 +142229,9 @@ var require_bufferCount = __commonJS({
               e_2 = { error: e_2_1 };
             } finally {
               try {
-                if (toEmit_1_1 && !toEmit_1_1.done && (_b = toEmit_1.return))
-                  _b.call(toEmit_1);
+                if (toEmit_1_1 && !toEmit_1_1.done && (_b = toEmit_1.return)) _b.call(toEmit_1);
               } finally {
-                if (e_2)
-                  throw e_2.error;
+                if (e_2) throw e_2.error;
               }
             }
           }
@@ -140067,11 +142246,9 @@ var require_bufferCount = __commonJS({
             e_3 = { error: e_3_1 };
           } finally {
             try {
-              if (buffers_2_1 && !buffers_2_1.done && (_a = buffers_2.return))
-                _a.call(buffers_2);
+              if (buffers_2_1 && !buffers_2_1.done && (_a = buffers_2.return)) _a.call(buffers_2);
             } finally {
-              if (e_3)
-                throw e_3.error;
+              if (e_3) throw e_3.error;
             }
           }
           subscriber.complete();
@@ -140090,16 +142267,13 @@ var require_bufferTime = __commonJS({
     "use strict";
     var __values = exports2 && exports2.__values || function(o) {
       var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-      if (m)
-        return m.call(o);
-      if (o && typeof o.length === "number")
-        return {
-          next: function() {
-            if (o && i >= o.length)
-              o = void 0;
-            return { value: o && o[i++], done: !o };
-          }
-        };
+      if (m) return m.call(o);
+      if (o && typeof o.length === "number") return {
+        next: function() {
+          if (o && i >= o.length) o = void 0;
+          return { value: o && o[i++], done: !o };
+        }
+      };
       throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -140165,11 +142339,9 @@ var require_bufferTime = __commonJS({
             e_1 = { error: e_1_1 };
           } finally {
             try {
-              if (recordsCopy_1_1 && !recordsCopy_1_1.done && (_a2 = recordsCopy_1.return))
-                _a2.call(recordsCopy_1);
+              if (recordsCopy_1_1 && !recordsCopy_1_1.done && (_a2 = recordsCopy_1.return)) _a2.call(recordsCopy_1);
             } finally {
-              if (e_1)
-                throw e_1.error;
+              if (e_1) throw e_1.error;
             }
           }
         }, function() {
@@ -140195,16 +142367,13 @@ var require_bufferToggle = __commonJS({
     "use strict";
     var __values = exports2 && exports2.__values || function(o) {
       var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-      if (m)
-        return m.call(o);
-      if (o && typeof o.length === "number")
-        return {
-          next: function() {
-            if (o && i >= o.length)
-              o = void 0;
-            return { value: o && o[i++], done: !o };
-          }
-        };
+      if (m) return m.call(o);
+      if (o && typeof o.length === "number") return {
+        next: function() {
+          if (o && i >= o.length) o = void 0;
+          return { value: o && o[i++], done: !o };
+        }
+      };
       throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -140240,11 +142409,9 @@ var require_bufferToggle = __commonJS({
             e_1 = { error: e_1_1 };
           } finally {
             try {
-              if (buffers_1_1 && !buffers_1_1.done && (_a = buffers_1.return))
-                _a.call(buffers_1);
+              if (buffers_1_1 && !buffers_1_1.done && (_a = buffers_1.return)) _a.call(buffers_1);
             } finally {
-              if (e_1)
-                throw e_1.error;
+              if (e_1) throw e_1.error;
             }
           }
         }, function() {
@@ -140443,21 +142610,17 @@ var require_combineLatest2 = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -140495,21 +142658,17 @@ var require_combineLatestWith = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -140573,21 +142732,17 @@ var require_concat2 = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -140623,21 +142778,17 @@ var require_concatWith = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -141120,21 +143271,17 @@ var require_endWith = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -141480,16 +143627,13 @@ var require_takeLast = __commonJS({
     "use strict";
     var __values = exports2 && exports2.__values || function(o) {
       var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-      if (m)
-        return m.call(o);
-      if (o && typeof o.length === "number")
-        return {
-          next: function() {
-            if (o && i >= o.length)
-              o = void 0;
-            return { value: o && o[i++], done: !o };
-          }
-        };
+      if (m) return m.call(o);
+      if (o && typeof o.length === "number") return {
+        next: function() {
+          if (o && i >= o.length) o = void 0;
+          return { value: o && o[i++], done: !o };
+        }
+      };
       throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -141516,11 +143660,9 @@ var require_takeLast = __commonJS({
             e_1 = { error: e_1_1 };
           } finally {
             try {
-              if (buffer_1_1 && !buffer_1_1.done && (_a = buffer_1.return))
-                _a.call(buffer_1);
+              if (buffer_1_1 && !buffer_1_1.done && (_a = buffer_1.return)) _a.call(buffer_1);
             } finally {
-              if (e_1)
-                throw e_1.error;
+              if (e_1) throw e_1.error;
             }
           }
           subscriber.complete();
@@ -141676,21 +143818,17 @@ var require_merge2 = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -141729,21 +143867,17 @@ var require_mergeWith = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -141818,21 +143952,17 @@ var require_onErrorResumeNextWith = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -142006,21 +144136,17 @@ var require_raceWith = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -142408,21 +144534,17 @@ var require_share = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -143116,16 +145238,13 @@ var require_windowCount = __commonJS({
     "use strict";
     var __values = exports2 && exports2.__values || function(o) {
       var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-      if (m)
-        return m.call(o);
-      if (o && typeof o.length === "number")
-        return {
-          next: function() {
-            if (o && i >= o.length)
-              o = void 0;
-            return { value: o && o[i++], done: !o };
-          }
-        };
+      if (m) return m.call(o);
+      if (o && typeof o.length === "number") return {
+        next: function() {
+          if (o && i >= o.length) o = void 0;
+          return { value: o && o[i++], done: !o };
+        }
+      };
       throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -143154,11 +145273,9 @@ var require_windowCount = __commonJS({
             e_1 = { error: e_1_1 };
           } finally {
             try {
-              if (windows_1_1 && !windows_1_1.done && (_a = windows_1.return))
-                _a.call(windows_1);
+              if (windows_1_1 && !windows_1_1.done && (_a = windows_1.return)) _a.call(windows_1);
             } finally {
-              if (e_1)
-                throw e_1.error;
+              if (e_1) throw e_1.error;
             }
           }
           var c = count - windowSize + 1;
@@ -143286,16 +145403,13 @@ var require_windowToggle = __commonJS({
     "use strict";
     var __values = exports2 && exports2.__values || function(o) {
       var s = typeof Symbol === "function" && Symbol.iterator, m = s && o[s], i = 0;
-      if (m)
-        return m.call(o);
-      if (o && typeof o.length === "number")
-        return {
-          next: function() {
-            if (o && i >= o.length)
-              o = void 0;
-            return { value: o && o[i++], done: !o };
-          }
-        };
+      if (m) return m.call(o);
+      if (o && typeof o.length === "number") return {
+        next: function() {
+          if (o && i >= o.length) o = void 0;
+          return { value: o && o[i++], done: !o };
+        }
+      };
       throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
@@ -143347,11 +145461,9 @@ var require_windowToggle = __commonJS({
             e_1 = { error: e_1_1 };
           } finally {
             try {
-              if (windowsCopy_1_1 && !windowsCopy_1_1.done && (_a = windowsCopy_1.return))
-                _a.call(windowsCopy_1);
+              if (windowsCopy_1_1 && !windowsCopy_1_1.done && (_a = windowsCopy_1.return)) _a.call(windowsCopy_1);
             } finally {
-              if (e_1)
-                throw e_1.error;
+              if (e_1) throw e_1.error;
             }
           }
         }, function() {
@@ -143424,21 +145536,17 @@ var require_withLatestFrom = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -143514,21 +145622,17 @@ var require_zip2 = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -143561,21 +145665,17 @@ var require_zipWith = __commonJS({
     "use strict";
     var __read = exports2 && exports2.__read || function(o, n) {
       var m = typeof Symbol === "function" && o[Symbol.iterator];
-      if (!m)
-        return o;
+      if (!m) return o;
       var i = m.call(o), r, ar = [], e;
       try {
-        while ((n === void 0 || n-- > 0) && !(r = i.next()).done)
-          ar.push(r.value);
+        while ((n === void 0 || n-- > 0) && !(r = i.next()).done) ar.push(r.value);
       } catch (error) {
         e = { error };
       } finally {
         try {
-          if (r && !r.done && (m = i["return"]))
-            m.call(i);
+          if (r && !r.done && (m = i["return"])) m.call(i);
         } finally {
-          if (e)
-            throw e.error;
+          if (e) throw e.error;
         }
       }
       return ar;
@@ -143604,20 +145704,16 @@ var require_cjs = __commonJS({
   "node_modules/rxjs/dist/cjs/index.js"(exports2) {
     "use strict";
     var __createBinding = exports2 && exports2.__createBinding || (Object.create ? function(o, m, k, k2) {
-      if (k2 === void 0)
-        k2 = k;
+      if (k2 === void 0) k2 = k;
       Object.defineProperty(o, k2, { enumerable: true, get: function() {
         return m[k];
       } });
     } : function(o, m, k, k2) {
-      if (k2 === void 0)
-        k2 = k;
+      if (k2 === void 0) k2 = k;
       o[k2] = m[k];
     });
     var __exportStar = exports2 && exports2.__exportStar || function(m, exports3) {
-      for (var p in m)
-        if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports3, p))
-          __createBinding(exports3, m, p);
+      for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports3, p)) __createBinding(exports3, m, p);
     };
     Object.defineProperty(exports2, "__esModule", { value: true });
     exports2.interval = exports2.iif = exports2.generate = exports2.fromEventPattern = exports2.fromEvent = exports2.from = exports2.forkJoin = exports2.empty = exports2.defer = exports2.connectable = exports2.concat = exports2.combineLatest = exports2.bindNodeCallback = exports2.bindCallback = exports2.UnsubscriptionError = exports2.TimeoutError = exports2.SequenceError = exports2.ObjectUnsubscribedError = exports2.NotFoundError = exports2.EmptyError = exports2.ArgumentOutOfRangeError = exports2.firstValueFrom = exports2.lastValueFrom = exports2.isObservable = exports2.identity = exports2.noop = exports2.pipe = exports2.NotificationKind = exports2.Notification = exports2.Subscriber = exports2.Subscription = exports2.Scheduler = exports2.VirtualAction = exports2.VirtualTimeScheduler = exports2.animationFrameScheduler = exports2.animationFrame = exports2.queueScheduler = exports2.queue = exports2.asyncScheduler = exports2.async = exports2.asapScheduler = exports2.asap = exports2.AsyncSubject = exports2.ReplaySubject = exports2.BehaviorSubject = exports2.Subject = exports2.animationFrames = exports2.observable = exports2.ConnectableObservable = exports2.Observable = void 0;
