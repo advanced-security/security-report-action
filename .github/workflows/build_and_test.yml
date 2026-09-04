@@ -1,0 +1,53 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build_and_test:
+    runs-on: ubuntu-latest
+
+    env:
+      GH_TEST_TOKEN: ${{ secrets.GH_TEST_TOKEN }}
+
+    steps:
+      - name: Checkout Sources
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        if: env.GH_TEST_TOKEN != ''
+        run: npm test
+
+      # Tests that talk to the GitHub API need a token with access to the test
+      # repositories, which is not available on pull requests from forks.
+      - name: Test (offline suites only)
+        if: env.GH_TEST_TOKEN == ''
+        run: |
+          npm test -- \
+            src/code-scanning/CodeScanningDelta.test.ts \
+            src/code-scanning/GitHubSarifReport.test.ts \
+            src/pdf/pdfWriter.test.ts \
+            src/templating/Template.test.ts
